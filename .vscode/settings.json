@@ -12,6 +12,10 @@
     "/^cd /Users/hankun/Documents/workspace/hankun/kcode && grep -rn \"theme\" --include=\"\\*\\.ts\" packages/services/src/setting/ packages/services/src/settings-sync/ packages/shared/src/protocol\\.ts 2>/dev/null \\| head -20; echo \"=== settings json ===\"; python3 -c \"\nimport json\np='/Users/hankun/\\.zcodex/v2/setting\\.json'\nd=json\\.load\\(open\\(p\\)\\)\nprint\\(json\\.dumps\\(d, indent=2, ensure_ascii=False\\)\\[:3000\\]\\)\n\"$/": {
       "approve": true,
       "matchCommandLine": true
+    },
+    "/^node -e \"const p=require\\('\\./packages/desktop/node_modules/electron-updater/package\\.json'\\);console\\.log\\(p\\.version\\)\" 2>/dev/null \\|\\| cat node_modules/electron-updater/package\\.json 2>/dev/null \\| head -5; ls packages/desktop/node_modules/electron-updater/out/providers/ 2>/dev/null$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }
