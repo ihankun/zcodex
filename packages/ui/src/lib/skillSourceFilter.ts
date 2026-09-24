@@ -4,10 +4,13 @@ type SkillSourceType = "glm" | "unknown";
 
 function resolveSkillSourceType(skillPath: string): SkillSourceType {
   const normalized = skillPath.replaceAll("\\", "/").toLowerCase();
-  if (normalized.includes("/.zcode/skills/")) {
-    return "glm";
-  }
-  if (normalized.includes("/.zcode/cli/plugins/cache/")) {
+  // 用户级目录已改 `.zcodex`，项目级与上游互认保持 `.zcode`，两类路径都算本产品来源。
+  if (
+    normalized.includes("/.zcodex/skills/") ||
+    normalized.includes("/.zcode/skills/") ||
+    normalized.includes("/.zcodex/cli/plugins/cache/") ||
+    normalized.includes("/.zcode/cli/plugins/cache/")
+  ) {
     return "glm";
   }
   return "unknown";

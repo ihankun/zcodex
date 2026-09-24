@@ -53,7 +53,7 @@ function resolveUserHomeDir() {
 }
 
 function getSettingsDir() {
-  return join(resolveUserHomeDir(), ".zcode", "v2");
+  return join(resolveUserHomeDir(), ".zcodex", "v2");
 }
 
 function getSettingsFile() {

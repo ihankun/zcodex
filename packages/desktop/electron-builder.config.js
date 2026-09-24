@@ -278,7 +278,7 @@ async function runTimedAsync(label, fn) {
 
 function resolveAppAsarPath(context) {
   if (context.electronPlatformName === "darwin") {
-    const appName = `${context.packager?.appInfo?.productFilename ?? "ZCode"}.app`;
+    const appName = `${context.packager?.appInfo?.productFilename ?? "ZCodex"}.app`;
     return resolve(context.appOutDir, appName, "Contents", "Resources", "app.asar");
   }
 
@@ -287,7 +287,7 @@ function resolveAppAsarPath(context) {
 
 function resolvePackagedResourcesDir(context) {
   if (context.electronPlatformName === "darwin") {
-    const appName = `${context.packager?.appInfo?.productFilename ?? "ZCode"}.app`;
+    const appName = `${context.packager?.appInfo?.productFilename ?? "ZCodex"}.app`;
     return resolve(context.appOutDir, appName, "Contents", "Resources");
   }
 
