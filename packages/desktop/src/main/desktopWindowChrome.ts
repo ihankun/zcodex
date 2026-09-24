@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- 桌面窗口 chrome、webview 安全策略和 popup 路由共享同一 BrowserWindow 生命周期上下文。 */
-import { app, BrowserWindow, Menu, nativeImage, nativeTheme, screen, shell } from "electron";
+import { app, BrowserWindow, Menu, nativeTheme, screen, shell } from "electron";
 import { join } from "node:path";
 import type {
   ContextMenuParams,
@@ -165,20 +165,6 @@ function buildDesktopWindowVisualOptions() {
     // 用户看到的是窗口外缘黑线。只在 Linux 禁用系统阴影，避免影响 macOS/Windows 的原生材质。
     hasShadow: false,
   };
-}
-
-export function applyAppIcon(iconPath: string) {
-  if (process.platform !== "darwin" || app.dock == null) {
-    return;
-  }
-
-  // TypeScript 不会因为 process.platform === "darwin" 自动收窄 app.dock。
-  // app.dock 的类型在定义上仍然可能是 undefined，直接调用会持续报 ts(18048)。
-  // 这里把平台判断和空值判断合并，既符合运行时语义，也让类型系统明确知道 Dock 一定存在。
-  const dockIcon = nativeImage.createFromPath(iconPath);
-  if (!dockIcon.isEmpty()) {
-    app.dock.setIcon(dockIcon);
-  }
 }
 
 function syncWindowFullscreenState(targetWindow: BrowserWindow) {

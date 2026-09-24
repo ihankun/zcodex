@@ -223,6 +223,10 @@ export function registerPlatformIpcHandlers(options: {
       return;
     }
 
+    // themeSource 必须原样透传 "system"：Electron 只在 kSystem 下跟随系统外观，
+    // 并且只有在跟随系统时才会把系统深浅变化转发给渲染进程（prefers-color-scheme
+    // 与 "change" 事件）。这里若把 "system" 解析成具体 dark/light，渲染进程的
+    // matchMedia 会被永久钉住，"跟随系统"失效。
     nativeTheme.themeSource = theme;
     applyWindowsTitleBarTheme(senderWindow, theme === "system" ? getWindowOverlayTheme() : theme);
   });

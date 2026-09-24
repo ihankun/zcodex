@@ -7,10 +7,10 @@
 
 两类最小改动，**均为用户可见层，未改内部标识符**：
 
-| 变更 | 原值 | 现值 |
-| --- | --- | --- |
-| 打包应用名 | `ZCode` / `ZCode Dev` / `ZCode Preview` | `ZCodex` / `ZCodex Dev` / `ZCodex Preview` |
-| home 数据目录 | `~/.zcode/` | `~/.zcodex/` |
+| 变更          | 原值                                    | 现值                                       |
+| ------------- | --------------------------------------- | ------------------------------------------ |
+| 打包应用名    | `ZCode` / `ZCode Dev` / `ZCode Preview` | `ZCodex` / `ZCodex Dev` / `ZCodex Preview` |
+| home 数据目录 | `~/.zcode/`                             | `~/.zcodex/`                               |
 
 历史数据不做迁移；项目内 `.zcode/` 目录与上游保持互认。
 
@@ -49,32 +49,66 @@
 - `apps/zcode-cli/packages/contracts/src/tools/saved-workflow.ts` — `SAVED_WORKFLOW_GLOBAL_DIR = ".zcodex/workflows"`（home），`SAVED_WORKFLOW_PROJECT_DIR` 保持 `.zcode/workflows`
 - `packages/ui/src/lib/skillSourceFilter.ts` — 路径来源检测同时匹配 `/.zcodex/...`（新用户级）与 `/.zcode/...`（项目级），勿删任一分支
 
-## 三、明确未改动（合并冲突时可直接采用上游）
+### 3. 启动强制升级 gate（已禁用）
 
-| 类别 | 说明 |
-| --- | --- |
-| npm 包名 `@zcode/*` | 全部 29 个包的 name、dependencies、import 均未动 |
-| 环境变量 `ZCODE_*` | 约 300 个 env 名未动（含 `ZCODE_DATA_BASE_DIR`、`ZCODE_HOME`） |
-| CLI 命令名 | `bin: { zcode }`、`zcode.cjs`、`bin/zcode.mjs` 未动 |
-| IPC 通道名 | `zcode-task`、`zcode:select-file` 等 channels.ts 通道字符串未动 |
-| 协议常量 | `ZCODE_PROTOCOL_NAME = "ZCode Protocol"`、`com.zcode/` MCP 命名空间、`Symbol.for("zcode.*")` 未动 |
-| 深链 scheme | `zcode://`（OAuth 回调、share/import、workspace/open）未动 |
-| 项目内目录 | `<项目>/.zcode/`（config.json、skills、agents、commands、workflows）、`.zcodeignore` 未动 |
-| 品牌文案 | i18n（en-US/zh-CN）、菜单项、Agent 系统提示词（"You are ZCode, ..."）、TUI 文案、README 未动 |
-| 隐藏文件 | `.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 等未动 |
+- `packages/desktop/src/main/index.ts` — 删除了 `maybeBlockStartupForForceUpdate` 的启动调用（保留 `forceUpdateGuard.ts` 本体）。原因：fork 版本号独立演进，必然低于上游线上 `minimalVersion`，gate 会永久拦截启动。上游更新此段启动逻辑时，不要恢复该调用。
+- `packages/desktop/build/dmg_background.png` 与 `dmg_background@2x.png` — DMG 安装界面背景图，文字由 ZCODE 重绘为 ZCODEX（PIL 生成，保留箭头与装饰图标）。上游更新此图后需重新处理文字。
+- `packages/desktop/src/main/desktopWindowChrome.ts` — 删除了 `applyAppIcon()`（启动时 `app.dock.setIcon` 覆盖 Dock 图标，导致丢失 macOS 系统渲染的图标光泽）。上游更新此段启动逻辑时，不要恢复该调用。
+- `packages/ui/src/Root.tsx` — `canEnterNativeThemeSyncSurface` 简化为 `!isStartupRenderBlocked`（上游原条件要求 workspaceShellPath/isSettingsTabActive/welcome 之一命中）。原因：主题是应用级偏好，不属于某个 workspace/设置页，"已进主界面但未打开任何项目"的空态在上游条件下不会同步 `nativeTheme.themeSource`，侧边栏毛玻璃（vibrancy）会跟随系统外观而与内容主题不一致（系统深色 + 应用浅色时侧边栏发黑）。注意毛玻璃效果是有意保留的，不要给侧边栏容器加不透明背景。上游改动此启动条件时需重新评估。
+
+## 三、踩坑记录（不要再重复）
+
+- **`packages/desktop/src/main/index.ts` 的 `@zcode/shared` 导入列表必须保留 `ZCODE_PRODUCT_FLAVOR`。**
+  它在本文件内被 `app.whenReady()` 回调用到（Windows AUMID、`initAutoUpdater({ enabled: ... })`）。
+  删掉导入后 tsup/esbuild 不做类型检查，构建照常成功，但运行时在此处抛
+  `ReferenceError: ZCODE_PRODUCT_FLAVOR is not defined`，使整个 `app.whenReady()`
+  的 async 链路中断：`registerPlatformIpcHandlers()`（同一个回调内、更早的位置）
+  之后的启动步骤全部不执行。外部表现是：
+  ① 窗口只能由 `activate`（点 Dock）兜底创建，看起来"应用在后台、点 Dock 才显示"；
+  ② renderer 侧所有 `ipcRenderer.invoke` 通道都报 `No handler registered`，
+  其中 `PlatformCmd.SetTitleBarTheme` 失效 ⇒ `nativeTheme.themeSource` 不再随
+  应用主题同步 ⇒ 浅色主题下侧边栏毛玻璃仍是深色、"跟随系统"也会被主进程里
+  写死的兜底值钉住。
+  验证方法：启动日志出现 `[error] [main] unhandledRejection` 且
+  `[primary-window] creating main window (app-activate)`（正常应为 `app-ready`）。
+  注意根 `pnpm typecheck` 只构建 `packages/desktop/tsconfig.host.json`，不覆盖
+  `tsconfig.main.json`（Electron main/preload/renderer），所以这个错误不会被现有
+  检查拦住；改动 main 进程后建议单独跑
+  `pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit`。
+- **不要为了让毛玻璃跟随主题去手写 `nativeTheme.themeSource` 兜底或重建 vibrancy。**
+  Electron 的 `nativeTheme.themeSource` 在 macOS 上会直接设置 `NSApp.appearance`
+  （`UpdateMacOSAppearanceForOverrideValue`），窗口与 `NSVisualEffectView` 立即跟随，
+  不需要 `setVibrancy(null)/setVibrancy(v)` 重建；把 `"system"` 解析成具体
+  `dark/light` 反而会让渲染进程的 `prefers-color-scheme` 被永久钉死、`change`
+  事件不再派发。renderer 的 `useDesktopNativeThemeSync` → `SetTitleBarTheme` 是
+  唯一的主题同步路径，链路正常时无需任何兜底。
+
+## 四、明确未改动（合并冲突时可直接采用上游）
+
+| 类别                | 说明                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| npm 包名 `@zcode/*` | 全部 29 个包的 name、dependencies、import 均未动                                                  |
+| 环境变量 `ZCODE_*`  | 约 300 个 env 名未动（含 `ZCODE_DATA_BASE_DIR`、`ZCODE_HOME`）                                    |
+| CLI 命令名          | `bin: { zcode }`、`zcode.cjs`、`bin/zcode.mjs` 未动                                               |
+| IPC 通道名          | `zcode-task`、`zcode:select-file` 等 channels.ts 通道字符串未动                                   |
+| 协议常量            | `ZCODE_PROTOCOL_NAME = "ZCode Protocol"`、`com.zcode/` MCP 命名空间、`Symbol.for("zcode.*")` 未动 |
+| 深链 scheme         | `zcode://`（OAuth 回调、share/import、workspace/open）未动                                        |
+| 项目内目录          | `<项目>/.zcode/`（config.json、skills、agents、commands、workflows）、`.zcodeignore` 未动         |
+| 品牌文案            | i18n（en-US/zh-CN）、菜单项、Agent 系统提示词（"You are ZCode, ..."）、TUI 文案、README 未动      |
+| 隐藏文件            | `.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 等未动                                 |
 
 ## 四、合并冲突决策表
 
-| 冲突场景 | 处理方式 |
-| --- | --- |
-| 上游改动第二节所列文件的**非路径行** | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量 |
-| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`） | 采用上游后手动改为 `.zcodex` |
-| 上游新增/修改 **user vs workspace** 目录 segments | 对照本文件二.4 的拆分表，仅 user 级改 `.zcodex` |
-| 上游改 productName / 应用名相关 | 保留本地 `ZCodex` 命名 |
-| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑 | 直接采用上游 |
-| 上游改品牌文案（i18n、提示词、菜单） | 直接采用上游 |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量 | 直接采用上游（本地未定制，无冲突基础） |
-| 上游新增数据目录子目录（v2 下新文件等） | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改 |
+| 冲突场景                                                                          | 处理方式                                                                                                      |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 上游改动第二节所列文件的**非路径行**                                              | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                |
+| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`） | 采用上游后手动改为 `.zcodex`                                                                                  |
+| 上游新增/修改 **user vs workspace** 目录 segments                                 | 对照本文件二.4 的拆分表，仅 user 级改 `.zcodex`                                                               |
+| 上游改 productName / 应用名相关                                                   | 保留本地 `ZCodex` 命名                                                                                        |
+| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑                       | 直接采用上游                                                                                                  |
+| 上游改品牌文案（i18n、提示词、菜单）                                              | 直接采用上游                                                                                                  |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                    | 直接采用上游（本地未定制，无冲突基础）                                                                        |
+| 上游新增数据目录子目录（v2 下新文件等）                                           | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改 |
 
 ## 五、合并后自查命令
 

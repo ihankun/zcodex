@@ -730,11 +730,11 @@ function RootInner({
     [platform],
   );
 
-  const canEnterNativeThemeSyncSurface = Boolean(
-    !isStartupRenderBlocked &&
-    !welcomeScreenOpenReason &&
-    (workspaceShellPath || isSettingsTabActive),
-  );
+  // 主题是应用级偏好，不属于 workspace/settings 页面。上游原条件要求
+  // workspaceShellPath/isSettingsTabActive/welcome 之一命中，导致"已进主界面但
+  // 未打开任何项目"的空态不同步 nativeTheme.themeSource：侧边栏毛玻璃跟随系统外观，
+  // 与内容主题不一致（系统深色 + 应用浅色时侧边栏发黑）。这里只要启动壳已退出就同步。
+  const canEnterNativeThemeSyncSurface = !isStartupRenderBlocked;
 
   useEffect(() => {
     if (!canEnterNativeThemeSyncSurface) {
@@ -742,7 +742,7 @@ function RootInner({
     }
 
     // macOS nativeTheme 会影响窗口 vibrancy。这里等 RootStartupLoading
-    // 真正退出并进入主界面/设置页后一轮再允许同步，避免启动壳背景被应用主题提前改写。
+    // 真正退出后一轮再允许同步，避免启动壳背景被应用主题提前改写。
     setHasEnteredNativeThemeSyncSurface(true);
   }, [canEnterNativeThemeSyncSurface]);
 
