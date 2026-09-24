@@ -7,5 +7,11 @@
   "[typescript]": {
     "editor.defaultFormatter": "oxc.oxc-vscode",
     "editor.formatOnSave": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    "/^cd /Users/hankun/Documents/workspace/hankun/kcode && grep -rn \"theme\" --include=\"\\*\\.ts\" packages/services/src/setting/ packages/services/src/settings-sync/ packages/shared/src/protocol\\.ts 2>/dev/null \\| head -20; echo \"=== settings json ===\"; python3 -c \"\nimport json\np='/Users/hankun/\\.zcodex/v2/setting\\.json'\nd=json\\.load\\(open\\(p\\)\\)\nprint\\(json\\.dumps\\(d, indent=2, ensure_ascii=False\\)\\[:3000\\]\\)\n\"$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
   }
 }
