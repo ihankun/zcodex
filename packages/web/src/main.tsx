@@ -322,6 +322,7 @@ function createWebPlatform(): IPlatformService {
     getUpdateState: () => Promise.resolve({ kind: "idle", enabled: true }),
     downloadUpdate: () => Promise.resolve(),
     cancelUpdateDownload: () => Promise.resolve(),
+    openDownloadedUpdateInstaller: () => Promise.resolve(),
     getDesktopSessionActivity: () => Promise.resolve({ runningAgentSessionCount: 0 }),
     getDesktopZoomLevel: () => Promise.resolve({ zoomLevel: 0 }),
     onDesktopZoomLevelChanged: () => () => {},

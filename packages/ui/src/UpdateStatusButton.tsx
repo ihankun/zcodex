@@ -47,6 +47,7 @@ export function UpdateStatusButton({
   const {
     dialogPhase,
     displayVersion,
+    manualInstaller,
     progressLabel,
     releaseNotesPayload: updateReleaseNotesPayload,
   } = updateStatusViewModel;
@@ -119,7 +120,10 @@ export function UpdateStatusButton({
             { version: displayVersion },
           )
       : dialogPhase === "downloaded"
-        ? intl.formatMessage({ id: "updateReady.tooltip" }, { version: displayVersion })
+        ? intl.formatMessage(
+            { id: manualInstaller ? "updateReady.manualTooltip" : "updateReady.tooltip" },
+            { version: displayVersion },
+          )
         : intl.formatMessage({ id: "updateAvailable.tooltip" }, { version: displayVersion });
 
   const readyButton = (

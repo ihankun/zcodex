@@ -27,11 +27,13 @@ import type {
 } from "./cuaAccessibilitySettings.js";
 import type { BrowserViewportSize } from "./browser-use/command-metadata.js";
 import type {
+  ManualUpdateInstallerPayload,
   PostUpdateReleaseNotesPayload,
   UpdateCheckResultPayload,
   UpdateStatePayload,
 } from "./update.js";
 export type {
+  ManualUpdateInstallerPayload,
   PostUpdateReleaseNotesPayload,
   UpdateCheckResultPayload,
   UpdateStatePayload,
@@ -938,6 +940,9 @@ export interface IPlatformService {
 
   /** 用户确认重启安装更新 */
   quitAndInstallUpdate(): Promise<void>;
+
+  /** 手动安装模式下打开已下载的安装包（macOS 未签名构建无法自动安装） */
+  openDownloadedUpdateInstaller(): Promise<void>;
 
   /** 获取系统中已安装的编辑器/终端列表（含图标） */
   getInstalledEditors(): Promise<EditorInfo[]>;

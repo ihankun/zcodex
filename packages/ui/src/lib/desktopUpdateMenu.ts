@@ -16,11 +16,15 @@ export function getUpdateMenuLabelId(state: UpdateStatePayload | null) {
     case "checking":
       return "desktopMenu.help.checkingForUpdates";
     case "update-available":
-      return "desktopMenu.help.updateAvailableVersion";
+      return state.manualInstaller
+        ? "desktopMenu.help.downloadUpdateManually"
+        : "desktopMenu.help.updateAvailableVersion";
     case "download-progress":
       return "desktopMenu.help.downloadingUpdateProgress";
     case "update-downloaded":
-      return "desktopMenu.help.restartToUpdate";
+      return state.manualInstaller
+        ? "desktopMenu.help.openDownloadedInstaller"
+        : "desktopMenu.help.restartToUpdate";
     case "idle":
     default:
       return "titleBar.menu.help.checkForUpdates";
@@ -39,4 +43,15 @@ export function getUpdateMenuLabelValues(
     default:
       return undefined;
   }
+}
+
+/** 手动安装模式下载完成后，更新入口点开的是安装包而不是重启安装。 */
+export function isManualInstallerUpdate(state: UpdateStatePayload | null): boolean {
+  return Boolean(
+    state &&
+    (state.kind === "update-available" ||
+      state.kind === "download-progress" ||
+      state.kind === "update-downloaded") &&
+    state.manualInstaller,
+  );
 }

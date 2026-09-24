@@ -269,6 +269,8 @@ declare global {
       downloadUpdate?(): Promise<void>;
       /** 取消当前正在下载的更新 */
       cancelUpdateDownload?(): Promise<void>;
+      /** 手动安装模式下打开已下载的安装包 */
+      openDownloadedUpdateInstaller?(): Promise<void>;
       /** 打开或聚焦独立更新窗口 */
       openUpdateStatusWindow?(): Promise<void>;
       /** 读取自动更新偏好 */

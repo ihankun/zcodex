@@ -99,16 +99,17 @@
 
 ## 四、合并冲突决策表
 
-| 冲突场景                                                                          | 处理方式                                                                                                      |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 上游改动第二节所列文件的**非路径行**                                              | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                |
-| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`） | 采用上游后手动改为 `.zcodex`                                                                                  |
-| 上游新增/修改 **user vs workspace** 目录 segments                                 | 对照本文件二.4 的拆分表，仅 user 级改 `.zcodex`                                                               |
-| 上游改 productName / 应用名相关                                                   | 保留本地 `ZCodex` 命名                                                                                        |
-| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑                       | 直接采用上游                                                                                                  |
-| 上游改品牌文案（i18n、提示词、菜单）                                              | 直接采用上游                                                                                                  |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                    | 直接采用上游（本地未定制，无冲突基础）                                                                        |
-| 上游新增数据目录子目录（v2 下新文件等）                                           | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改 |
+| 冲突场景                                                                                   | 处理方式                                                                                                                           |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 上游改动第二节所列文件的**非路径行**                                                       | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                     |
+| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`）          | 采用上游后手动改为 `.zcodex`                                                                                                       |
+| 上游新增/修改 **user vs workspace** 目录 segments                                          | 对照本文件二.4 的拆分表，仅 user 级改 `.zcodex`                                                                                    |
+| 上游改 productName / 应用名相关                                                            | 保留本地 `ZCodex` 命名                                                                                                             |
+| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑                                | 直接采用上游                                                                                                                       |
+| 上游改品牌文案（i18n、提示词、菜单）                                                       | 直接采用上游                                                                                                                       |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                             | 直接采用上游（本地未定制，无冲突基础）                                                                                             |
+| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项） | 保留本地 GitHub Release 方案（第七节），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项 |
+| 上游新增数据目录子目录（v2 下新文件等）                                                    | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                      |
 
 ## 五、合并后自查命令
 
@@ -131,3 +132,66 @@ pnpm typecheck && pnpm lint && pnpm architecture:check --changed
 2. 打包产物（`.zcode-runtime/`、`dist/`、`packages/desktop/bundled-agents/`）为构建生成物，改名后重新构建即可，无需手改。
 3. `third-party/inventory.json` 记录了文件内容 sha256，涉及第三方声明文件的合并后需重新生成声明材料（见 `third-party/README.md`）。
 4. 若未来要改品牌文案或内部标识符（包名、env、协议），应更新本文档后再动手。
+5. 桌面自动更新的分发方式见第七节；改 `autoUpdater.ts`、`githubReleaseUpdateFeed.ts` 或 `scripts/github-release-channel.mjs` 前先读该节，客户端与发布脚本依赖同一套清单命名。
+
+## 七、桌面自动更新源：GitHub Release（2026-09-24 后新增）
+
+### 1. 为什么改
+
+上游桌面自动更新依赖 `https://zcode.z.ai/api/v1/releases/electron/manifest`，只有上游发布通道才有对应
+清单与安装包，fork 自己打的包永远检查不到更新。改成读自己仓库的 GitHub Release 后，fork 可以独立发版。
+
+### 2. 改动清单（合并冲突时保护本地版本）
+
+| 文件                                                          | 说明                                                                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/desktop/scripts/github-release-channel.mjs`（新）   | 仓库 owner/repo、feed 基址、tag 规则、清单命名规则；main 进程与发布脚本共用                                                                                                                                  |
+| `packages/desktop/scripts/github-release-channel.d.mts`（新） | 上述模块的声明文件，供 main 进程 TS 导入                                                                                                                                                                     |
+| `packages/desktop/src/main/githubReleaseUpdateFeed.ts`（新）  | `GitHubReleaseUpdateProvider`：按 `<通道>-<平台>-<架构>.yml` 取清单、解析安装包地址、把旧 blockmap 指向历史 Release                                                                                          |
+| `packages/desktop/scripts/publish-github-release.mjs`（新）   | 发布脚本：改名清单、注入 release notes、校验 sha512、输出/执行 `gh release` 命令                                                                                                                             |
+| `packages/desktop/src/main/manifestUpdateProvider.ts`（删除） | 服务端 manifest provider，已无引用                                                                                                                                                                           |
+| `packages/desktop/src/main/autoUpdater.ts`                    | `applyManifestUpdateProvider` → `applyGitHubReleaseUpdateFeed`；`InitAutoUpdaterOptions` 删除 `deviceMid` / `resolveEndpointOrigin`；`pendingManifestReleaseChannelRefresh` → `pendingReleaseChannelRefresh` |
+| `packages/desktop/src/main/index.ts`                          | `initAutoUpdater` 调用去掉 `deviceMid` / `resolveEndpointOrigin`                                                                                                                                             |
+| `README.md`、`NOTICE.md`、根 `package.json`                   | 发布流程说明、网络行为描述、`publish:github` 脚本入口                                                                                                                                                        |
+
+### 3. 约定（改动前先确认这三条）
+
+- 客户端请求 `https://github.com/ihankun/zcodex/releases/latest/download/<通道>-<平台>-<架构>.yml`；
+  清单名必须带架构，否则同一 Release 里第二个架构的清单会覆盖第一个。
+- Release tag 必须是 `v<版本>`，且 Release 不能是 pre-release（`releases/latest` 会跳过 pre-release）；
+  差分更新按这个约定到 `releases/download/v<旧版本>/` 取旧 `.blockmap`，取不到时退回全量下载。
+- 通道来自设置里的「接收 preview 版本」：stable → `latest-*.yml`，preview → `preview-*.yml`；
+  两个通道的清单与安装包必须都在**同一个最新 Release** 里，否则另一个通道的用户取不到文件。
+
+### 4. 注意事项
+
+- `ZCODE_UPDATE_FEED_URL` / `--zcode-update-feed-url` 的语义随之变成「清单与安装包的静态目录基址」
+  （仍只在开发构建生效），不再指向服务端 manifest 接口；用本地目录联调时请把清单按命名规则放好。
+- GitHub Release 资源只保证单 Range 请求，`GitHubReleaseUpdateProvider.isUseMultipleRangeRequest`
+  必须保持 `false`。
+- 上游若重新引入「按平台/架构向服务端要清单」的逻辑，不要直接采用：本地只有一个 GitHub 发布源。
+
+### 5. 手动安装回退（未签名 macOS 构建）
+
+Squirrel 比对的是运行中应用与下载包的**签名标识要求（designated requirement）**。`identity: null`
+打包时 electron-builder 直接跳过签名，运行中的包保留 Electron 自带的 ad-hoc 签名，标识是
+`cdhash H"..."`（每个构建都不同），自动安装在 staging 阶段必然失败（本仓 dev 记录里的
+`SQRLUpdaterErrorDomain code=2` 就是这一类）。
+
+| 文件                                                         | 说明                                                                                    |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `packages/desktop/src/main/updateInstallCapability.ts`（新） | 读运行中 bundle 的 designated requirement；未签名或含 `cdhash` → 手动安装，否则自动安装 |
+| `packages/desktop/src/main/manualUpdateInstaller.ts`（新）   | 下载本平台安装包到「下载」目录、按清单 sha512/size 校验、`shell.openPath` 打开          |
+
+- 判定在每次启动时重新执行（`packages/desktop/src/main/autoUpdater.ts` 的 `initAutoUpdater`），
+  签名后无需改代码即可恢复自动更新。
+- 手动流程：`update-available` 状态带 `manualInstaller` 字段 → 用户点「下载安装包」→
+  复用 `download-progress` 状态上报进度 → 完成后 `update-downloaded` + `manualInstaller`，
+  打开安装包并把按钮切成「打开安装包」（新 IPC `zcode:open-downloaded-update-installer`）。
+- 手动模式不写 `pendingPostUpdateReleaseNotes`：那份记录会被启动流程当成「已有暂存更新」而显示
+  「重启以更新」，与手动安装的事实不符。
+- 新增 i18n：`updateDialog.downloadInstaller` / `updateDialog.openInstaller` /
+  `updateDialog.manualInstallHint` / `updateDialog.manualInstallerReadyHint` /
+  `updateReady.manualTooltip` / `update.toast.manualReady` /
+  `desktopMenu.help.downloadUpdateManually` / `desktopMenu.help.openDownloadedInstaller`
+  （前三者的菜单文案同时出现在 `packages/shared/src/desktopMenu.ts` 与 `packages/ui/src/i18n/locales/`）。

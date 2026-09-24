@@ -1,5 +1,6 @@
 import type {
   ElectronReleaseChannel,
+  ManualUpdateInstallerPayload,
   PostUpdateReleaseNotesPayload,
   UpdateStatePayload,
 } from "@zcode/shared";
@@ -11,6 +12,8 @@ export type UpdateActionInFlight = "download" | "cancel" | "skip" | "restart" | 
 export type UpdateStatusViewModel = {
   dialogPhase: UpdateStatusDialogPhase;
   displayVersion: string | null;
+  /** 存在时表示这轮更新走手动安装：下载安装包后由用户自己替换，不能引导“重启以更新”。 */
+  manualInstaller: ManualUpdateInstallerPayload | undefined;
   progressLabel: string | null;
   progressValue: number;
   releaseNotesPayload: PostUpdateReleaseNotesPayload | undefined;
@@ -44,6 +47,12 @@ export function deriveUpdateStatusViewModel({
         ? "downloading"
         : "before-download",
     displayVersion,
+    manualInstaller:
+      updateState?.kind === "update-available" ||
+      updateState?.kind === "download-progress" ||
+      updateState?.kind === "update-downloaded"
+        ? updateState.manualInstaller
+        : undefined,
     progressLabel: getUpdateDownloadProgressLabel(updateState),
     progressValue: getUpdateDownloadProgressValue(updateState),
     releaseNotesPayload: getUpdateReleaseNotesPayload(updateState),

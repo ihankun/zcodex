@@ -23,8 +23,19 @@ export type UpdateCheckResultPayload =
   | { kind: "downloading"; version: string }
   | { kind: "already-downloading"; version: string; progress: string }
   | { kind: "ready"; version: string }
+  /** 手动安装模式下安装包已就绪：界面提示打开安装包，而不是重启安装。 */
+  | { kind: "manual-ready"; version: string }
   | { kind: "dev-skipped" }
   | { kind: "error"; message: string };
+
+/**
+ * 手动安装模式：当前构建无法由 electron-updater 自动安装时（macOS 未签名或 ad-hoc 签名的构建，
+ * Squirrel 比对签名标识必然失败），改为下载本平台安装包并交给用户手动替换。
+ */
+export interface ManualUpdateInstallerPayload {
+  /** 安装包文件名；界面据此提示用户到「下载」目录找它。 */
+  fileName: string;
+}
 
 /**
  * 桌面自动更新器的持续状态，用于同步原生菜单和 Windows 自绘标题栏菜单。
@@ -38,6 +49,8 @@ export type UpdateStatePayload =
       version: string;
       channel?: ElectronReleaseChannel;
       releaseNotes?: PostUpdateReleaseNotesPayload;
+      /** 存在时表示这轮更新走手动安装，界面不再引导自动下载安装。 */
+      manualInstaller?: ManualUpdateInstallerPayload;
     }
   | {
       kind: "download-progress";
@@ -48,6 +61,7 @@ export type UpdateStatePayload =
       version?: string;
       channel?: ElectronReleaseChannel;
       releaseNotes?: PostUpdateReleaseNotesPayload;
+      manualInstaller?: ManualUpdateInstallerPayload;
     }
   | {
       kind: "update-downloaded";
@@ -55,4 +69,5 @@ export type UpdateStatePayload =
       version: string;
       channel?: ElectronReleaseChannel;
       releaseNotes?: PostUpdateReleaseNotesPayload;
+      manualInstaller?: ManualUpdateInstallerPayload;
     };

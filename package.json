@@ -30,6 +30,7 @@
     "bundle:desktop": "pnpm --filter @zcode/desktop run bundle --",
     "package:mac": "node scripts/bundle-desktop-env.mjs mac",
     "package:win": "node scripts/bundle-desktop-env.mjs win",
+    "publish:github": "node packages/desktop/scripts/publish-github-release.mjs",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "knip": "knip",

@@ -735,6 +735,9 @@ contextBridge.exposeInMainWorld("zcode", {
   downloadUpdate: () => ipcRenderer.invoke(PlatformChannels.DownloadUpdate),
   /** 取消当前正在下载的更新 */
   cancelUpdateDownload: () => ipcRenderer.invoke(PlatformChannels.CancelUpdateDownload),
+  /** 手动安装模式下打开已下载的安装包 */
+  openDownloadedUpdateInstaller: () =>
+    ipcRenderer.invoke(PlatformChannels.OpenDownloadedUpdateInstaller),
   /** 打开独立更新窗口 */
   openUpdateStatusWindow: () => ipcRenderer.invoke(PlatformChannels.OpenUpdateStatusWindow),
   /** 读取自动更新偏好 */

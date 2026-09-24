@@ -262,6 +262,14 @@ export function useRootPlatformEffects({
             case "ready":
               toast(intl.formatMessage({ id: "update.toast.ready" }, { version: payload.version }));
               return;
+            case "manual-ready":
+              toast(
+                intl.formatMessage(
+                  { id: "update.toast.manualReady" },
+                  { version: payload.version },
+                ),
+              );
+              return;
             case "dev-skipped":
               toast(intl.formatMessage({ id: "update.toast.devSkipped" }));
               return;

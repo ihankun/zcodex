@@ -157,6 +157,44 @@ pnpm bundle:desktop -- --help
 sudo xattr -rd com.apple.quarantine /Applications/ZCode.app
 ```
 
+### 桌面版自动更新发布
+
+桌面自动更新从 GitHub Release 读取清单（`https://github.com/ihankun/zcodex/releases/latest/download`），
+不再访问 ZCode 服务端。清单名与产物同时按平台和架构区分，避免同一 Release 里后上传的架构覆盖先上传的：
+
+```
+latest-mac-arm64.yml   latest-mac-x64.yml   latest-win-x64.yml   latest-linux-x64.yml
+latest-<平台>-<架构>.yml   对应   ZCodex-<版本>-<平台>-<架构>.zip / .exe / .AppImage
+```
+
+把打包产物整理成可上传文件（会校验清单版本、文件大小与 sha512）：
+
+```bash
+pnpm publish:github -- --platform mac --arch arm64 \
+  --notes-file release-notes.md [--notes-file-en release-notes-en.md] [--channel stable] [--upload]
+```
+
+不传 `--upload` 时只输出待上传文件与 `gh release` 命令；改名后的清单写在
+`packages/desktop/dist/github-release/`。上传约定：
+
+- Release tag 必须是 `v<版本>`，且版本号与根 `package.json` 一致；
+- 该 Release **不能**是 pre-release，否则 `releases/latest` 会指向别的 Release；
+- 待上传内容包括安装包、同名 `.blockmap`（差分更新用）和改名后的清单；
+- macOS 自动更新要求新旧包使用同一 Developer ID 签名，未签名包只会得到下载失败；
+- 使用 `--channel preview` 时，该 Release 必须同时包含 stable 通道的清单与安装包，否则 stable 用户取不到文件。
+
+### 未签名 macOS 构建的更新方式
+
+Squirrel（macOS 自动更新）会比对运行中应用与下载到的新应用的签名标识。未签名或 ad-hoc 签名的构建，
+标识是每个构建独有的 `cdhash`，安装必然失败。应用会自动识别这种情况并切换到「手动安装」：
+
+- 不再下载 Squirrel 用的 zip，改为把本架构 DMG 下载到系统「下载」文件夹（校验清单里的 sha512）
+  并自动打开，用户拖入「应用程序」即完成更新；
+- 更新入口与弹窗文案随之变化（「下载安装包」/「打开安装包」），并提示当前构建未签名。
+
+打包时启用签名（Developer ID 或自签名证书，`ZCODE_ENABLE_MAC_SIGN=1` + `CSC_NAME`）后，
+行为自动切回自动更新，无需改代码。
+
 ### ZCode 命令行版
 
 构建入口为 `pnpm build:zcode`。脚本会依次构建 CLI/TUI、后端和 Web，收集 TUI 的原生库、worker 与运行时依赖，再组装发行包；运行发行包仍需要 Node.js，版本以 `mise.toml` 为准。

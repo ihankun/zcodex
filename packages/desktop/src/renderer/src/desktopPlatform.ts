@@ -127,6 +127,8 @@ export function createDesktopPlatform(options: {
       window.zcode.getUpdateState?.() ?? Promise.resolve({ kind: "idle", enabled: true }),
     downloadUpdate: () => window.zcode.downloadUpdate?.() ?? Promise.resolve(),
     cancelUpdateDownload: () => window.zcode.cancelUpdateDownload?.() ?? Promise.resolve(),
+    openDownloadedUpdateInstaller: () =>
+      window.zcode.openDownloadedUpdateInstaller?.() ?? Promise.resolve(),
     openUpdateStatusWindow: () => window.zcode.openUpdateStatusWindow?.() ?? Promise.resolve(),
     getAutoUpdatePreferences: () =>
       window.zcode.getAutoUpdatePreferences?.() ??

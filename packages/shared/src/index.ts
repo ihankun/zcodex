@@ -215,6 +215,7 @@ export type {
   RemoteSessionClosedEvent,
   RemoteServiceSession,
   SSHConfigAliasOption,
+  ManualUpdateInstallerPayload,
   TaskNotificationPayload,
   UpdateCheckResultPayload,
   UpdateStatePayload,

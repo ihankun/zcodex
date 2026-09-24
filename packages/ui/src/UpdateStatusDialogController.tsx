@@ -58,6 +58,7 @@ export function UpdateStatusDialogController({
   const {
     dialogPhase,
     displayVersion,
+    manualInstaller,
     progressLabel,
     progressValue,
     releaseNotesPayload: updateReleaseNotesPayload,
@@ -198,8 +199,22 @@ export function UpdateStatusDialogController({
       throw error;
     }
   }, [onOpenChange, platform, setUpdateActionInFlight, skippableVersion]);
-  const handleRestartUpdate = useCallback(async () => {
+  const handleInstallUpdate = useCallback(async () => {
     if (updateActionInFlightRef.current) {
+      return;
+    }
+
+    if (manualInstaller) {
+      // 手动安装模式没有退出接管，也不需要打断进行中的任务：打开已下载的安装包即可。
+      // 状态仍停在 update-downloaded，若沿用自动路径的 pending 规则按钮会永久禁用。
+      setUpdateActionInFlight("restart");
+      try {
+        await platform.openDownloadedUpdateInstaller();
+        setUpdateActionInFlight(null);
+      } catch (error) {
+        setUpdateActionInFlight(null);
+        throw error;
+      }
       return;
     }
 
@@ -233,7 +248,14 @@ export function UpdateStatusDialogController({
       setUpdateActionInFlight(null);
       throw error;
     }
-  }, [displayVersion, intl, platform, requestConfirmation, setUpdateActionInFlight]);
+  }, [
+    displayVersion,
+    intl,
+    manualInstaller,
+    platform,
+    requestConfirmation,
+    setUpdateActionInFlight,
+  ]);
 
   useEffect(() => {
     if (!displayVersion && updateState !== null) {
@@ -288,12 +310,13 @@ export function UpdateStatusDialogController({
       intl={intl}
       isUpdateActionPending={updateActionInFlight !== null}
       localizedUpdateReleaseNotes={visibleUpdateReleaseNotes}
+      manualInstaller={manualInstaller ?? null}
       onAutoDownloadAndInstallUpdatesChange={handleAutoDownloadAndInstallUpdatesChange}
       onCancelDownload={handleCancelDownload}
       onDownloadUpdate={handleDownloadUpdate}
+      onInstallUpdate={handleInstallUpdate}
       onOpenChange={onOpenChange}
       onOpenReleaseNotesExternalUrl={handleOpenReleaseNotesExternalUrl}
-      onRestartUpdate={handleRestartUpdate}
       onSkipUpdate={handleSkipUpdate}
       open={open}
       phase={dialogPhase}

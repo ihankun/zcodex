@@ -1,3 +1,4 @@
+import type { ManualUpdateInstallerPayload } from "@zcode/shared";
 import { CalendarDays } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
@@ -26,11 +27,12 @@ export function UpdateStatusDialog({
   intl,
   isUpdateActionPending,
   autoDownloadAndInstallUpdates,
+  manualInstaller,
   onAutoDownloadAndInstallUpdatesChange,
   onCancelDownload,
   onDownloadUpdate,
+  onInstallUpdate,
   onOpenChange,
-  onRestartUpdate,
   onSkipUpdate,
   open,
   phase,
@@ -45,13 +47,15 @@ export function UpdateStatusDialog({
   intl: IntlInstance;
   isUpdateActionPending: boolean;
   autoDownloadAndInstallUpdates: boolean;
+  /** 非 null 表示这轮更新由用户手动安装，按钮与说明都要按手动流程渲染。 */
+  manualInstaller: ManualUpdateInstallerPayload | null;
   localizedUpdateReleaseNotes: LocalizedUpdateReleaseNotes | null;
   onAutoDownloadAndInstallUpdatesChange: (enabled: boolean) => Promise<void>;
   onCancelDownload: () => Promise<void>;
   onDownloadUpdate: () => Promise<void>;
+  onInstallUpdate: () => Promise<void>;
   onOpenChange: (open: boolean) => void;
   onOpenReleaseNotesExternalUrl: (url: string) => void;
-  onRestartUpdate: () => Promise<void>;
   onSkipUpdate: () => Promise<void>;
   open: boolean;
   phase: UpdateStatusDialogPhase;
@@ -64,6 +68,7 @@ export function UpdateStatusDialog({
   const isBeforeDownload = phase === "before-download";
   const isDownloading = phase === "downloading";
   const isDownloaded = phase === "downloaded";
+  const isManualInstall = manualInstaller !== null;
   const dialogTitleId = isDownloaded
     ? "updateDialog.readyTitle"
     : isDownloading
@@ -150,7 +155,20 @@ export function UpdateStatusDialog({
       ) : null}
 
       <div className={cn("[app-region:no-drag]", isDownloading ? "-mt-2" : null)}>
-        {isBeforeDownload ? (
+        {isManualInstall && !isDownloading ? (
+          <p className="mb-4 text-ui-base leading-5 text-foreground-subtle">
+            {isDownloaded
+              ? intl.formatMessage(
+                  { id: "updateDialog.manualInstallerReadyHint" },
+                  { fileName: manualInstaller.fileName },
+                )
+              : intl.formatMessage(
+                  { id: "updateDialog.manualInstallHint" },
+                  { fileName: manualInstaller.fileName },
+                )}
+          </p>
+        ) : null}
+        {isBeforeDownload && !isManualInstall ? (
           <label className="mb-4 flex min-w-0 items-center gap-2 text-ui-base leading-5 text-foreground">
             <Checkbox
               checked={autoDownloadAndInstallUpdates}
@@ -224,9 +242,13 @@ export function UpdateStatusDialog({
                 size="lg"
                 className="h-9 px-4"
                 disabled={isUpdateActionPending}
-                onClick={() => void onRestartUpdate()}
+                onClick={() => void onInstallUpdate()}
               >
-                {intl.formatMessage({ id: "updateDialog.restartToUpdate" })}
+                {intl.formatMessage({
+                  id: isManualInstall
+                    ? "updateDialog.openInstaller"
+                    : "updateDialog.restartToUpdate",
+                })}
               </Button>
             ) : isDownloading ? (
               <Button
@@ -247,7 +269,11 @@ export function UpdateStatusDialog({
                 disabled={isUpdateActionPending}
                 onClick={() => void onDownloadUpdate()}
               >
-                {intl.formatMessage({ id: "updateDialog.downloadAndUpdate" })}
+                {intl.formatMessage({
+                  id: isManualInstall
+                    ? "updateDialog.downloadInstaller"
+                    : "updateDialog.downloadAndUpdate",
+                })}
               </Button>
             )}
           </div>
