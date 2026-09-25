@@ -1555,8 +1555,6 @@ const enUS: Record<string, string> = {
   "updateDialog.downloadAndUpdate": "Download update",
   "updateDialog.downloadInstaller": "Download installer",
   "updateDialog.openInstaller": "Open installer",
-  "updateDialog.manualInstallHint":
-    "This build is not code signed, so it cannot install updates automatically. Downloading puts {fileName} in your Downloads folder and opens it; drag it into Applications to finish updating.",
   "updateDialog.manualInstallerReadyHint":
     "{fileName} is in your Downloads folder. Drag it into Applications to replace the old version, then reopen the app.",
   "updateDialog.cancelDownload": "Cancel download",

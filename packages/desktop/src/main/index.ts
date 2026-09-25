@@ -665,6 +665,11 @@ const UPDATE_STATUS_WINDOW_WIDTH = 512;
 const UPDATE_STATUS_WINDOW_COMPACT_HEIGHT = 205;
 const UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT = 224;
 const UPDATE_STATUS_WINDOW_READY_HEIGHT = UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT - 54;
+// 中间区域要有内容时的窗口高度。独立窗口不可缩放，高度必须容得下
+// 「顶部拖拽留白 + 标题 + 中间区 + 按钮」，否则 overflow-hidden 会把按钮裁掉：
+// 205px 只够「标题 + 单行按钮」；未签名安装提示约占 56px，更新说明区留约 196px。
+const UPDATE_STATUS_WINDOW_MANUAL_READY_HEIGHT = 260;
+const UPDATE_STATUS_WINDOW_NOTES_HEIGHT = 380;
 const UPDATE_STATUS_WINDOW_TRAFFIC_LIGHT_POSITION = { x: 10, y: 10 } as const;
 const mainSettingService = createSettingService();
 const appLaunchGate = createAppLaunchGate();
@@ -1481,8 +1486,19 @@ function syncUpdateStatusWindowChrome(win: BrowserWindow) {
 }
 
 function resolveUpdateStatusWindowHeight(state: UpdateStatePayload) {
+  if (state.kind === "idle" || state.kind === "checking") {
+    return UPDATE_STATUS_WINDOW_COMPACT_HEIGHT;
+  }
   if (state.kind === "download-progress") {
     return UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT;
+  }
+  // 更新说明渲染在中间滚动区，窗口必须相应加高；继续用紧凑高度会把 footer 顶出窗口。
+  if (state.releaseNotes) {
+    return UPDATE_STATUS_WINDOW_NOTES_HEIGHT;
+  }
+  // 未签名构建下载完成后要显示「把安装包拖进应用程序」的提示，比纯按钮高度多出一段文字。
+  if (state.kind === "update-downloaded" && state.manualInstaller) {
+    return UPDATE_STATUS_WINDOW_MANUAL_READY_HEIGHT;
   }
   if (state.kind === "update-downloaded") {
     return UPDATE_STATUS_WINDOW_READY_HEIGHT;

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog.js";
 import { Checkbox } from "@/components/ui/checkbox.js";
 import { Progress } from "@/components/ui/progress.js";
+import { MessageResponse } from "@/components/ai-elements/message.js";
 import type { IntlInstance } from "@/i18n/IntlProvider.js";
 import type { UpdateStatusDialogPhase } from "@/updateStatusModel.js";
 
@@ -27,12 +28,14 @@ export function UpdateStatusDialog({
   intl,
   isUpdateActionPending,
   autoDownloadAndInstallUpdates,
+  localizedUpdateReleaseNotes,
   manualInstaller,
   onAutoDownloadAndInstallUpdatesChange,
   onCancelDownload,
   onDownloadUpdate,
   onInstallUpdate,
   onOpenChange,
+  onOpenReleaseNotesExternalUrl,
   onSkipUpdate,
   open,
   phase,
@@ -81,6 +84,11 @@ export function UpdateStatusDialog({
   });
   const showSkipVersion = isBeforeDownload && Boolean(skippableVersion);
   const showLaterButton = !isDownloading;
+  // 手动安装模式下，只有“安装包已下好”才需要提示用户拖进「应用程序」；
+  // 下载前不再占用中间区域——那块位置留给发布时填写的更新说明。
+  const showManualInstallerReadyHint = isManualInstall && isDownloaded;
+  const hasMiddleContent =
+    isDownloading || Boolean(localizedUpdateReleaseNotes) || showManualInstallerReadyHint;
   const titleClassName =
     "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui-base font-medium leading-5 text-foreground";
   const titleContent = (
@@ -94,11 +102,13 @@ export function UpdateStatusDialog({
   );
   const contentClassName = cn(
     "max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-hidden p-5 sm:max-w-lg",
-    edgeToEdge && !isDownloading
-      ? // 普通/下载完成状态没有中间内容，不能继续使用 minmax(0,1fr)。
+    hasMiddleContent
+      ? // 中间区域（更新说明/进度）用 minmax(0,1fr) 撑满并自行滚动，
+        // footer 永远留在最后一行，不会被说明文本顶出可视区域。
+        "grid-rows-[auto_minmax(0,1fr)_auto]"
+      : // 没有中间内容时不能继续使用 minmax(0,1fr)。
         // 否则 footer 会占满剩余窗口高度，按钮被垂直居中后看起来像中间有大块空白。
-        "grid-rows-[auto_auto]"
-      : "grid-rows-[auto_minmax(0,1fr)_auto]",
+        "grid-rows-[auto_auto]",
     edgeToEdge
       ? // 独立更新窗口已经由 BrowserWindow 提供窗口边框和阴影。
         // 这里不能再保留页内 DialogContent 的边框、阴影和视口边距，否则会出现“窗中窗”。
@@ -132,42 +142,55 @@ export function UpdateStatusDialog({
         </div>
       </DialogHeader>
 
-      {isDownloading ? (
+      {hasMiddleContent ? (
         <div className="min-h-0 overflow-y-auto [app-region:no-drag]">
-          <section className="space-y-2" aria-live="polite">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-ui-base font-medium leading-5 text-foreground">
-                {intl.formatMessage({ id: "updateDialog.downloadProgress" })}
-              </span>
-              {progressLabel ? (
-                <span className="font-mono text-ui-base leading-5 text-foreground">
-                  {progressLabel}
+          {isDownloading ? (
+            <section className="space-y-2" aria-live="polite">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-ui-base font-medium leading-5 text-foreground">
+                  {intl.formatMessage({ id: "updateDialog.downloadProgress" })}
                 </span>
+                {progressLabel ? (
+                  <span className="font-mono text-ui-base leading-5 text-foreground">
+                    {progressLabel}
+                  </span>
+                ) : null}
+              </div>
+              <Progress
+                value={progressValue}
+                className="zcode-update-charge-progress h-2 bg-primary/15 dark:bg-primary/20"
+                indicatorClassName="bg-primary"
+              />
+            </section>
+          ) : (
+            <div className="space-y-3">
+              {showManualInstallerReadyHint && manualInstaller ? (
+                <p className="text-ui-base leading-5 text-foreground-subtle">
+                  {intl.formatMessage(
+                    { id: "updateDialog.manualInstallerReadyHint" },
+                    { fileName: manualInstaller.fileName },
+                  )}
+                </p>
+              ) : null}
+              {localizedUpdateReleaseNotes ? (
+                // 更新说明直接来自发布时写进清单的 releaseNotes，排版与更新入口的 hover 提示一致。
+                <MessageResponse
+                  className={cn(
+                    "prose prose-sm max-w-none text-ui-sm leading-relaxed text-foreground dark:prose-invert",
+                    "prose-headings:font-semibold prose-headings:tracking-tight",
+                    "prose-h1:text-ui-lg prose-h2:text-ui-base prose-h3:text-ui-base",
+                  )}
+                  onOpenExternalUrl={onOpenReleaseNotesExternalUrl}
+                >
+                  {localizedUpdateReleaseNotes.markdown}
+                </MessageResponse>
               ) : null}
             </div>
-            <Progress
-              value={progressValue}
-              className="zcode-update-charge-progress h-2 bg-primary/15 dark:bg-primary/20"
-              indicatorClassName="bg-primary"
-            />
-          </section>
+          )}
         </div>
       ) : null}
 
       <div className={cn("[app-region:no-drag]", isDownloading ? "-mt-2" : null)}>
-        {isManualInstall && !isDownloading ? (
-          <p className="mb-4 text-ui-base leading-5 text-foreground-subtle">
-            {isDownloaded
-              ? intl.formatMessage(
-                  { id: "updateDialog.manualInstallerReadyHint" },
-                  { fileName: manualInstaller.fileName },
-                )
-              : intl.formatMessage(
-                  { id: "updateDialog.manualInstallHint" },
-                  { fileName: manualInstaller.fileName },
-                )}
-          </p>
-        ) : null}
         {isBeforeDownload && !isManualInstall ? (
           <label className="mb-4 flex min-w-0 items-center gap-2 text-ui-base leading-5 text-foreground">
             <Checkbox

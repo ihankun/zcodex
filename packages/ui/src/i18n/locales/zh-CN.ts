@@ -1440,8 +1440,6 @@ const zhCN: Record<string, string> = {
   "updateDialog.downloadAndUpdate": "下载更新",
   "updateDialog.downloadInstaller": "下载安装包",
   "updateDialog.openInstaller": "打开安装包",
-  "updateDialog.manualInstallHint":
-    "当前构建未签名，无法自动安装。点「下载安装包」会把 {fileName} 下载到「下载」文件夹并打开，把它拖入「应用程序」即完成更新。",
   "updateDialog.manualInstallerReadyHint":
     "{fileName} 已下载到「下载」文件夹。把它拖入「应用程序」覆盖旧版本，再重新打开应用即完成更新。",
   "updateDialog.cancelDownload": "取消下载",
