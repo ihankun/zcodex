@@ -1,7 +1,7 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本目录用于记录本项目相对上游 ZCode 主版本的本地定制，处理合并冲突时先读本文档。
-> 记录时间：2026-09-24。上游基线：ZCode 3.14.0（`feat: open source`）。
+> 记录时间：2026-09-24。上游基线：ZCode 3.14.3（`feat: update v3.14.3`）。
 
 ## 一、本次变更概述
 
@@ -195,3 +195,36 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
   `updateReady.manualTooltip` / `update.toast.manualReady` /
   `desktopMenu.help.downloadUpdateManually` / `desktopMenu.help.openDownloadedInstaller`
   （前三者的菜单文案同时出现在 `packages/shared/src/desktopMenu.ts` 与 `packages/ui/src/i18n/locales/`）。
+
+## 八、本次合并记录（2026-09-25，上游 v3.14.0 → v3.14.3）
+
+上游提交：`29628c9 feat: update v3.14.3`（283 文件，+30342/−1768）。
+
+**冲突 2 处，处理方式：**
+
+| 文件                                                           | 冲突内容                                                                                                     | 处理                                                                                         |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `package.json`                                                 | 上游把根版本改成 `3.14.3`                                                                                    | 保留本地 `1.0.0`：fork 版本独立演进，`publish-github-release.mjs` 按根版本号校验 Release tag |
+| `apps/zcode-cli/packages/contracts/src/tools/save-workflow.ts` | 上游精简了 `scope` 字段的 `.describe()` 文案，本地那行带 `~/.zcodex/workflows`（第二节规则要求的路径字面量） | 取上游的简写，把 `~/.zcodex/workflows` 写回该行                                              |
+
+**上游新增内容（直接采用，无本地定制）：**
+
+- Bot 接入：`packages/services/src/bots/**`（Feishu / Telegram / 微信 / Webhook）、
+  `packages/ui/src/BotsDialog/**`、`packages/ui/src/botsUi.ts`、`packages/desktop/src/host/cronBotDelivery.ts`，
+  以及 desktop / services 对 `@larksuiteoapi/node-sdk` 的依赖 → **合并后必须 `pnpm install`**。
+- Bot 的存储走 `getAppConfigDir()`（`packages/services/src/bots/repo.ts` 等），因此自动落在
+  `~/.zcodex/v2` 下，无需再改路径字面量。
+- 桌面 main 的 Bot 远端 workspace 重连/状态 IPC handler（`packages/desktop/src/main/index.ts`）。
+
+**这次合并的两个注意点：**
+
+1. 上游新文件**不跑 oxfmt**。合并后 `pnpm fmt:check` 从 1 个失败文件（`packages/desktop/src/main/desktopRuntimeEnv.ts`，本地既有）变成 33 个，其中 31 个是上游新文件原样带入（`bots/**`、`BotsDialog/**` 等）。
+   **不要**为了 `fmt:check` 去格式化这些上游文件，否则每次合并都会在这些文件上产生冲突；只格式化本地改动的文件。
+   同上，`README.md` 上游版本本身也不是 oxfmt 干净的，不要顺手格式化。
+2. 上游改写 `packages/desktop/src/main/index.ts` 时，本地三项定制都保留：`ZCODE_PRODUCT_FLAVOR` 导入（第三节踩坑）、
+   force-gate 启动调用保持删除、`initAutoUpdater({ ..., updateFeedSource })` 参数保持本地版本（不再有 `deviceMid` / `resolveEndpointOrigin`）。
+
+**合并后自查结果：** 第五节两条 grep 干净（home 级拼接无残留 `.zcode`、应用名仍为 `ZCodex`）；
+`pnpm typecheck` / `pnpm lint`（70 警告 0 错误）/ `pnpm architecture:check --changed` 通过。
+`tsconfig.main.json` 类型错误 82 → 86、`tsconfig.renderer.json` 125 → 126，新增部分全部落在与上游逐字节一致的文件里
+（上游自身的既有类型缺口），本地定制文件没有新增错误。
