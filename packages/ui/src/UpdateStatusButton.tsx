@@ -121,7 +121,13 @@ export function UpdateStatusButton({
           )
       : dialogPhase === "downloaded"
         ? intl.formatMessage(
-            { id: manualInstaller ? "updateReady.manualTooltip" : "updateReady.tooltip" },
+            {
+              id: manualInstaller
+                ? manualInstaller.canInstallAutomatically
+                  ? "updateReady.manualTooltip"
+                  : "updateReady.manualOpenTooltip"
+                : "updateReady.tooltip",
+            },
             { version: displayVersion },
           )
         : intl.formatMessage({ id: "updateAvailable.tooltip" }, { version: displayVersion });

@@ -1539,7 +1539,9 @@ const enUS: Record<string, string> = {
   "updateReady.title": "Update v{version}",
   "updateReady.releaseNotesTitle": "v{version} Release Notes",
   "updateReady.tooltip": "v{version} ready, click to restart and update",
-  "updateReady.manualTooltip": "Installer for v{version} is downloaded. Click to open it.",
+  "updateReady.manualTooltip":
+    "Installer for v{version} is downloaded. Click to install and restart.",
+  "updateReady.manualOpenTooltip": "Installer for v{version} is downloaded. Click to open it.",
   "updateAvailable.tooltip": "New version v{version} is available. Click to review.",
   "updateReady.confirm.title": "Update to v{version}?",
   "updateReady.confirm.description":
@@ -1555,6 +1557,10 @@ const enUS: Record<string, string> = {
   "updateDialog.downloadAndUpdate": "Download update",
   "updateDialog.downloadInstaller": "Download installer",
   "updateDialog.openInstaller": "Open installer",
+  "updateDialog.installAndRestart": "Install and restart",
+  "updateDialog.showInstaller": "Show installer",
+  "updateDialog.manualInstallerAutoHint":
+    "{fileName} is downloaded. Choosing Install and restart quits the app, replaces the installed copy and reopens it automatically.",
   "updateDialog.manualInstallerReadyHint":
     "{fileName} is in your Downloads folder. Drag it into Applications to replace the old version, then reopen the app.",
   "updateDialog.cancelDownload": "Cancel download",
@@ -1569,7 +1575,8 @@ const enUS: Record<string, string> = {
   "update.toast.downloading": "Downloading new version v{version}",
   "update.toast.alreadyDownloading": "Downloading new version ({progress}%)",
   "update.toast.ready": "v{version} downloaded, restart to install",
-  "update.toast.manualReady": "Installer for v{version} is downloaded. Open it to update.",
+  "update.toast.manualReady":
+    "Installer for v{version} is downloaded. Choose Install and restart to update.",
   "update.toast.devSkipped": "Updates are disabled in dev builds",
   "update.toast.error": "Update check failed: {error}",
   "forceUpdate.title": "Update ZCode to continue",
@@ -1586,6 +1593,7 @@ const enUS: Record<string, string> = {
   "desktopMenu.help.downloadingUpdateProgress": "Downloading update... {progress}",
   "desktopMenu.help.downloadUpdateManually": "Download update ({version})",
   "desktopMenu.help.openDownloadedInstaller": "Open installer ({version})",
+  "desktopMenu.help.installAndRestart": "Install and restart ({version})",
   "desktopMenu.help.restartUpdateAction": "Restart to update",
   "desktopMenu.help.restartToUpdate": "Restart to update ({version})",
   "postUpdateReleaseNotes.title": "Release notes",

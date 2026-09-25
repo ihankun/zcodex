@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, rename, rm, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
 import { app, net, shell } from "electron";
+import { getAppConfigDir } from "@zcode/services/node";
 import { logger } from "./logger.js";
 
 export interface ManualUpdateInstallerTarget {
@@ -185,4 +187,36 @@ export async function openManualUpdateInstaller(filePath: string): Promise<void>
   if (openError) {
     throw new Error(`open installer failed: ${openError}`);
   }
+}
+
+/**
+ * 起一个脱离本进程的安装脚本：它先等本进程退出，再挂载 DMG、替换 bundle、重新打开应用。
+ *
+ * 必须 detached + unref：应用马上要自杀，脚本得活下来接管后续步骤。
+ * 返回日志路径便于排查——脚本失败时用户只会看到应用重启回旧版本，原因只在日志里。
+ */
+export async function startManualUpdateInstall(options: {
+  installerFilePath: string;
+  scriptPath: string;
+}): Promise<{ logFilePath: string }> {
+  if (process.platform !== "darwin") {
+    throw new Error(`manual install script is macOS only (platform=${process.platform})`);
+  }
+
+  const bundlePath = resolve(app.getAppPath(), "../../..");
+  const logDir = join(getAppConfigDir(), "logs");
+  await mkdir(logDir, { recursive: true });
+  const logFilePath = join(logDir, `update-install-${Date.now()}.log`);
+  await writeFile(logFilePath, "", "utf-8");
+
+  const child = spawn(
+    "/bin/sh",
+    [options.scriptPath, String(process.pid), bundlePath, options.installerFilePath, logFilePath],
+    { detached: true, stdio: "ignore" },
+  );
+  child.unref();
+  logger.info(
+    `[manual-update] install script spawned pid=${child.pid ?? "unknown"} bundle=${bundlePath} log=${logFilePath}`,
+  );
+  return { logFilePath };
 }

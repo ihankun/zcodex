@@ -205,11 +205,17 @@ export function UpdateStatusDialogController({
     }
 
     if (manualInstaller) {
-      // 手动安装模式没有退出接管，也不需要打断进行中的任务：打开已下载的安装包即可。
-      // 状态仍停在 update-downloaded，若沿用自动路径的 pending 规则按钮会永久禁用。
+      // 手动安装模式不走 electron-updater：能替换 bundle 时由辅助脚本接手（应用会自动退出），
+      // 否则退回打开安装包让用户自己拖。
+      // 两种都不会回到 pending 前的状态，而状态仍停在 update-downloaded，
+      // 若沿用自动路径的 pending 规则按钮会永久禁用，所以这里自己收敛。
       setUpdateActionInFlight("restart");
       try {
-        await platform.openDownloadedUpdateInstaller();
+        if (manualInstaller.canInstallAutomatically) {
+          await platform.installDownloadedUpdateInstaller();
+        } else {
+          await platform.openDownloadedUpdateInstaller();
+        }
         setUpdateActionInFlight(null);
       } catch (error) {
         setUpdateActionInFlight(null);
@@ -256,6 +262,11 @@ export function UpdateStatusDialogController({
     requestConfirmation,
     setUpdateActionInFlight,
   ]);
+
+  const handleShowInstaller = useCallback(async () => {
+    // 「显示安装包」是自动替换失败时的兜底入口，语义永远只是打开已下载的安装包。
+    await platform.openDownloadedUpdateInstaller();
+  }, [platform]);
 
   useEffect(() => {
     if (!displayVersion && updateState !== null) {
@@ -317,6 +328,7 @@ export function UpdateStatusDialogController({
       onInstallUpdate={handleInstallUpdate}
       onOpenChange={onOpenChange}
       onOpenReleaseNotesExternalUrl={handleOpenReleaseNotesExternalUrl}
+      onShowInstaller={handleShowInstaller}
       onSkipUpdate={handleSkipUpdate}
       open={open}
       phase={dialogPhase}

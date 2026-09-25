@@ -412,6 +412,7 @@ export const PlatformChannels = {
   QuitAndInstallUpdate: "zcode:quit-and-install-update",
   /** Renderer → Main：手动安装模式下打开已下载的安装包 */
   OpenDownloadedUpdateInstaller: "zcode:open-downloaded-update-installer",
+  InstallDownloadedUpdateInstaller: "zcode:install-downloaded-update-installer",
   /** Renderer → Main：获取系统中已安装的编辑器/终端列表（含图标） */
   GetInstalledEditors: "zcode:get-installed-editors",
   /** Renderer → Main：按 bundle id 获取系统应用图标 */
@@ -1140,6 +1141,10 @@ export interface PlatformChannelMap {
     response: void;
   };
   [PlatformChannels.OpenDownloadedUpdateInstaller]: {
+    request: void;
+    response: void;
+  };
+  [PlatformChannels.InstallDownloadedUpdateInstaller]: {
     request: void;
     response: void;
   };

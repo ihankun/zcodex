@@ -749,6 +749,9 @@ contextBridge.exposeInMainWorld("zcode", {
   /** 手动安装模式下打开已下载的安装包 */
   openDownloadedUpdateInstaller: () =>
     ipcRenderer.invoke(PlatformChannels.OpenDownloadedUpdateInstaller),
+  /** 手动安装模式下执行安装（退出后由辅助脚本替换 bundle 再重新打开） */
+  installDownloadedUpdateInstaller: () =>
+    ipcRenderer.invoke(PlatformChannels.InstallDownloadedUpdateInstaller),
   /** 打开独立更新窗口 */
   openUpdateStatusWindow: () => ipcRenderer.invoke(PlatformChannels.OpenUpdateStatusWindow),
   /** 读取自动更新偏好 */

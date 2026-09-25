@@ -35,6 +35,11 @@ export type UpdateCheckResultPayload =
 export interface ManualUpdateInstallerPayload {
   /** 安装包文件名；界面据此提示用户到「下载」目录找它。 */
   fileName: string;
+  /**
+   * `true`：下载完成后可以由辅助脚本退出应用、替换 bundle 并重新打开（macOS 未签名构建）。
+   * `false`：只能打开安装包让用户手动拖进「应用程序」（换不了正在运行的 bundle 时）。
+   */
+  canInstallAutomatically: boolean;
 }
 
 /**

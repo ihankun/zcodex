@@ -12,7 +12,6 @@
 </p>
 
 
-
 ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Agent。本仓库包含客户端、后端服务、共享 UI，以及 Agent CLI 与运行时源码。
 
 ## 更新
@@ -191,12 +190,21 @@ pnpm publish:github --platform mac --arch arm64 \
 Squirrel（macOS 自动更新）会比对运行中应用与下载到的新应用的签名标识。未签名或 ad-hoc 签名的构建，
 标识是每个构建独有的 `cdhash`，安装必然失败。应用会自动识别这种情况并切换到「手动安装」：
 
-- 不再下载 Squirrel 用的 zip，改为把本架构 DMG 下载到系统「下载」文件夹（校验清单里的 sha512）
-  并自动打开，用户拖入「应用程序」即完成更新；
-- 更新入口与弹窗文案随之变化（「下载安装包」/「打开安装包」），并提示当前构建未签名。
+- 不再下载 Squirrel 用的 zip，改为把本架构 DMG 下载到系统「下载」文件夹，并按清单里的 sha512/size 校验；
+- 下载完成后用户可以点「**安装并重启**」完成更新：应用先停掉 host/agent 子进程并退出，由
+  `resources/macos-update-installer.sh`（随包发布，`extraResources`）挂载 DMG、把新 app 复制到同卷暂存目录、
+  原子替换当前 bundle（失败回滚旧版本并打开 DMG 让用户手动拖），最后自动重新打开新版本。
+  脚本日志写在 `~/.zcodex/v2/logs/update-install-<时间戳>.log`；
+- 同时保留「显示安装包」入口：想手动拖进「应用程序」时可以直接打开 DMG；
+- 当前安装位置无法被替换时（从 DMG/下载目录直接启动触发的 App Translocation、bundle 所在目录不可写、
+  非 macOS），按钮与菜单都退回「打开安装包」，不会让用户按下一个不生效的按钮。
+
+脚本的工作前提：应用装在当前用户可写的位置（macOS 上 `/Applications` 对 `admin` 组可写、
+bundle 属主是当前用户），所以替换不需要 sudo，也不需要 Apple 开发者证书；代价是绕过了
+Gatekeeper/公证，完整性只依赖 HTTPS 与清单里的 sha512。
 
 打包时启用签名（Developer ID 或自签名证书，`ZCODE_ENABLE_MAC_SIGN=1` + `CSC_NAME`）后，
-行为自动切回自动更新，无需改代码。
+行为自动切回官方 Squirrel 自动更新，上述脚本不再参与，无需改代码。
 
 ### ZCode 命令行版
 

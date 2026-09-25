@@ -276,6 +276,8 @@ declare global {
       cancelUpdateDownload?(): Promise<void>;
       /** 手动安装模式下打开已下载的安装包 */
       openDownloadedUpdateInstaller?(): Promise<void>;
+      /** 手动安装模式下执行安装（退出后由辅助脚本替换 bundle 再重新打开） */
+      installDownloadedUpdateInstaller?(): Promise<void>;
       /** 打开或聚焦独立更新窗口 */
       openUpdateStatusWindow?(): Promise<void>;
       /** 读取自动更新偏好 */

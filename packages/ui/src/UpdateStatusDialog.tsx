@@ -36,6 +36,7 @@ export function UpdateStatusDialog({
   onInstallUpdate,
   onOpenChange,
   onOpenReleaseNotesExternalUrl,
+  onShowInstaller,
   onSkipUpdate,
   open,
   phase,
@@ -58,6 +59,7 @@ export function UpdateStatusDialog({
   onDownloadUpdate: () => Promise<void>;
   onInstallUpdate: () => Promise<void>;
   onOpenChange: (open: boolean) => void;
+  onShowInstaller: () => Promise<void>;
   onOpenReleaseNotesExternalUrl: (url: string) => void;
   onSkipUpdate: () => Promise<void>;
   open: boolean;
@@ -84,11 +86,11 @@ export function UpdateStatusDialog({
   });
   const showSkipVersion = isBeforeDownload && Boolean(skippableVersion);
   const showLaterButton = !isDownloading;
-  // 手动安装模式下，只有“安装包已下好”才需要提示用户拖进「应用程序」；
-  // 下载前不再占用中间区域——那块位置留给发布时填写的更新说明。
-  const showManualInstallerReadyHint = isManualInstall && isDownloaded;
+  // 未签名构建：能自动替换 bundle 时下载完成给「安装并重启」，否则只能打开安装包让用户自己拖。
+  const canAutoInstall = manualInstaller?.canInstallAutomatically === true;
+  const showManualInstallerHint = isManualInstall && isDownloaded;
   const hasMiddleContent =
-    isDownloading || Boolean(localizedUpdateReleaseNotes) || showManualInstallerReadyHint;
+    isDownloading || Boolean(localizedUpdateReleaseNotes) || showManualInstallerHint;
   const titleClassName =
     "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui-base font-medium leading-5 text-foreground";
   const titleContent = (
@@ -164,10 +166,14 @@ export function UpdateStatusDialog({
             </section>
           ) : (
             <div className="space-y-3">
-              {showManualInstallerReadyHint && manualInstaller ? (
+              {showManualInstallerHint && manualInstaller ? (
                 <p className="text-ui-base leading-5 text-foreground-subtle">
                   {intl.formatMessage(
-                    { id: "updateDialog.manualInstallerReadyHint" },
+                    {
+                      id: canAutoInstall
+                        ? "updateDialog.manualInstallerAutoHint"
+                        : "updateDialog.manualInstallerReadyHint",
+                    },
                     { fileName: manualInstaller.fileName },
                   )}
                 </p>
@@ -259,6 +265,18 @@ export function UpdateStatusDialog({
                 {intl.formatMessage({ id: "updateDialog.later" })}
               </Button>
             ) : null}
+            {isDownloaded && isManualInstall && canAutoInstall ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                className="h-9 px-4"
+                disabled={isUpdateActionPending}
+                onClick={() => void onShowInstaller()}
+              >
+                {intl.formatMessage({ id: "updateDialog.showInstaller" })}
+              </Button>
+            ) : null}
             {isDownloaded ? (
               <Button
                 type="button"
@@ -269,7 +287,9 @@ export function UpdateStatusDialog({
               >
                 {intl.formatMessage({
                   id: isManualInstall
-                    ? "updateDialog.openInstaller"
+                    ? canAutoInstall
+                      ? "updateDialog.installAndRestart"
+                      : "updateDialog.openInstaller"
                     : "updateDialog.restartToUpdate",
                 })}
               </Button>

@@ -956,6 +956,12 @@ export interface IPlatformService {
   /** 手动安装模式下打开已下载的安装包（macOS 未签名构建无法自动安装） */
   openDownloadedUpdateInstaller(): Promise<void>;
 
+  /**
+   * 手动安装模式下用辅助脚本完成安装：退出应用 → 替换 bundle → 重新打开。
+   * 当前安装位置无法替换时主进程会退化成打开安装包。
+   */
+  installDownloadedUpdateInstaller(): Promise<void>;
+
   /** 获取系统中已安装的编辑器/终端列表（含图标） */
   getInstalledEditors(): Promise<EditorInfo[]>;
 

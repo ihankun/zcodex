@@ -579,6 +579,12 @@ export default {
             from: "resources/macos-window-bounds/zcode-window-bounds",
             to: "macos-window-bounds/zcode-window-bounds",
           },
+          {
+            // 未签名构建的自更新脚本：由主进程 spawn 出来，等应用退出后替换 bundle 再重新打开。
+            // 缺失时手动更新降级为「打开安装包让用户拖」，所以这里也不做存在性断言。
+            from: "resources/macos-update-installer.sh",
+            to: "macos-update-installer.sh",
+          },
         ]
       : []),
     {

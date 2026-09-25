@@ -178,23 +178,35 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 `cdhash H"..."`（每个构建都不同），自动安装在 staging 阶段必然失败（本仓 dev 记录里的
 `SQRLUpdaterErrorDomain code=2` 就是这一类）。
 
-| 文件                                                         | 说明                                                                                    |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `packages/desktop/src/main/updateInstallCapability.ts`（新） | 读运行中 bundle 的 designated requirement；未签名或含 `cdhash` → 手动安装，否则自动安装 |
-| `packages/desktop/src/main/manualUpdateInstaller.ts`（新）   | 下载本平台安装包到「下载」目录、按清单 sha512/size 校验、`shell.openPath` 打开          |
+| 文件                                                         | 说明                                                                                                                                                                                   |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/desktop/src/main/updateInstallCapability.ts`（新） | 读运行中 bundle 的 designated requirement；未签名或含 `cdhash` → 手动安装，否则自动安装；并判定手动安装能否升级为「脚本自动替换」                                                      |
+| `packages/desktop/src/main/manualUpdateInstaller.ts`（新）   | 下载本平台安装包到「下载」目录、按清单 sha512/size 校验；`shell.openPath` 打开；派生分离的安装脚本                                                                                     |
+| `packages/desktop/resources/macos-update-installer.sh`（新） | 等应用退出 → 挂载 DMG → `ditto` 到同卷暂存 → 原子替换 bundle（失败回滚）→ `xattr` 去隔离 → `open` 新版本；失败则打开 DMG 并拉回旧版本，日志在 `~/.zcodex/v2/logs/update-install-*.log` |
+
+- 脚本随包发布：`electron-builder.config.js` 的 darwin `extraResources` 把它放到 `Contents/Resources/macos-update-installer.sh`；
+  `updateInstallCapability` 在启动时判定 `manualInstallSupported`（非 AppTranslocation、bundle 目录可写、脚本存在），
+  结果通过 `ManualUpdateInstallerPayload.canInstallAutomatically` 传给界面，决定按钮是「安装并重启」还是「打开安装包」。
+  上游若改动 `extraResources` 或更新窗口高度常量（`resolveUpdateStatusWindowHeight`），注意保留这一项。
 
 - 判定在每次启动时重新执行（`packages/desktop/src/main/autoUpdater.ts` 的 `initAutoUpdater`），
   签名后无需改代码即可恢复自动更新。
-- 手动流程：`update-available` 状态带 `manualInstaller` 字段 → 用户点「下载安装包」→
-  复用 `download-progress` 状态上报进度 → 完成后 `update-downloaded` + `manualInstaller`，
-  打开安装包并把按钮切成「打开安装包」（新 IPC `zcode:open-downloaded-update-installer`）。
-- 手动模式不写 `pendingPostUpdateReleaseNotes`：那份记录会被启动流程当成「已有暂存更新」而显示
-  「重启以更新」，与手动安装的事实不符。
+- 手动流程：`update-available` 带 `manualInstaller` → 用户点「下载安装包」→ 复用 `download-progress`
+  上报进度 → 完成后 `update-downloaded` + `manualInstaller`，按钮是「安装并重启」（能自动替换时）
+  或「打开安装包」（换不了 bundle 时），旁边另给「显示安装包」兜底入口。
+- 安装命令：新 IPC `zcode:install-downloaded-update-installer` → `installDownloadedUpdate()`：
+  落 `pendingPostUpdateReleaseNotes`（这次真的换版本了）→ 复用 `onBeforeQuitAndInstall` 停 host/agent →
+  派生分离脚本 → `app.quit()`。**不要**把它改回 `quitAndInstallUpdate`：那条链路依赖 Squirrel 接管，
+  在未签名构建上会把用户丢在一次没有任何后续动作的退出里。
+- 只有「打开安装包手动拖」这条路不写 `pendingPostUpdateReleaseNotes`（那份记录会被启动流程当成
+  「已有暂存更新」而显示「重启以更新」，与需要用户自己拖的事实不符）。
 - 新增 i18n：`updateDialog.downloadInstaller` / `updateDialog.openInstaller` /
-  `updateDialog.manualInstallHint` / `updateDialog.manualInstallerReadyHint` /
-  `updateReady.manualTooltip` / `update.toast.manualReady` /
-  `desktopMenu.help.downloadUpdateManually` / `desktopMenu.help.openDownloadedInstaller`
-  （前三者的菜单文案同时出现在 `packages/shared/src/desktopMenu.ts` 与 `packages/ui/src/i18n/locales/`）。
+  `updateDialog.installAndRestart` / `updateDialog.showInstaller` /
+  `updateDialog.manualInstallerAutoHint` / `updateDialog.manualInstallerReadyHint` /
+  `updateReady.manualTooltip` / `updateReady.manualOpenTooltip` / `update.toast.manualReady` /
+  `desktopMenu.help.downloadUpdateManually` / `desktopMenu.help.openDownloadedInstaller` /
+  `desktopMenu.help.installAndRestart`（菜单文案同时出现在 `packages/shared/src/desktopMenu.ts`
+  与 `packages/ui/src/i18n/locales/`，两处都要改）。
 
 ## 八、本次合并记录（2026-09-25，上游 v3.14.0 → v3.14.3）
 

@@ -26,9 +26,11 @@ import {
   ManualUpdateDownloadCancelledError,
   downloadManualUpdateInstaller,
   openManualUpdateInstaller,
+  startManualUpdateInstall,
   type ManualUpdateInstallerTarget,
 } from "./manualUpdateInstaller.js";
 import {
+  resolveManualUpdateInstallerScriptPath,
   resolveUpdateInstallCapability,
   type UpdateInstallCapability,
 } from "./updateInstallCapability.js";
@@ -64,12 +66,17 @@ let downloadCancellationToken: CancellationToken | null = null;
 let readyUpdateChannel: ElectronReleaseChannel | null = null;
 let pendingReleaseChannelRefresh: ElectronReleaseChannel | null = null;
 // 手动安装模式（macOS 未签名/ad-hoc 构建装不上 Squirrel 更新）：改为下载本平台安装包交给用户安装。
-let installCapability: UpdateInstallCapability = { autoInstall: true, reason: "unresolved" };
+let installCapability: UpdateInstallCapability = {
+  autoInstall: true,
+  manualInstallSupported: false,
+  reason: "unresolved",
+};
 let updateFeedSourceUrl: string | undefined;
 let manualInstallerTarget: ManualUpdateInstallerTarget | null = null;
 let manualInstallerVersion: string | null = null;
 let manualInstallerFilePath: string | null = null;
 let manualUpdateDownloadAbort: AbortController | null = null;
+let manualUpdateInstallInFlight = false;
 let onBeforeQuitAndInstall: (() => void | Promise<void>) | undefined;
 const acknowledgedPostUpdateReleaseNotesVersions = new Set<string>();
 const cancelledDownloadTokens = new WeakSet<CancellationToken>();
@@ -348,7 +355,12 @@ function buildUpdateDownloadedState(version: string): AutoUpdaterMenuState {
 function getManualInstallerField(): { manualInstaller?: ManualUpdateInstallerPayload } {
   return installCapability.autoInstall || !manualInstallerTarget
     ? {}
-    : { manualInstaller: { fileName: manualInstallerTarget.fileName } };
+    : {
+        manualInstaller: {
+          fileName: manualInstallerTarget.fileName,
+          canInstallAutomatically: installCapability.manualInstallSupported,
+        },
+      };
 }
 
 function buildUpdateAvailableState(
@@ -537,7 +549,11 @@ function getMenuItemLabel(state: AutoUpdaterMenuState): string {
       return formatDesktopMenuMessage(
         menuLocale,
         state.manualInstaller
-          ? desktopMenuMessageIds.helpOpenDownloadedInstaller
+          ? // 未签名构建可以用辅助脚本完成安装时，菜单文案必须和弹窗按钮一致，
+            // 否则菜单写着「打开安装包」、点下去却退出了应用。
+            state.manualInstaller.canInstallAutomatically
+            ? desktopMenuMessageIds.helpInstallAndRestart
+            : desktopMenuMessageIds.helpOpenDownloadedInstaller
           : desktopMenuMessageIds.helpRestartToUpdate,
         { version: state.version },
       );
@@ -1242,6 +1258,75 @@ async function openDownloadedInstaller(): Promise<void> {
   await openManualUpdateInstaller(manualInstallerFilePath);
 }
 
+/**
+ * 手动安装模式下的「安装并重启」：先做退出准备，再让辅助脚本等本进程退出后替换 bundle。
+ *
+ * 这条链路只有 macOS 未签名构建会走到，任何一步不满足（换不了当前 bundle）都退回「打开安装包」，
+ * 不让用户按下一个不会生效的按钮。
+ */
+async function installDownloadedUpdate(): Promise<void> {
+  if (installCapability.autoInstall) {
+    await quitAndInstallUpdate();
+    return;
+  }
+
+  const scriptPath = resolveManualUpdateInstallerScriptPath();
+  if (!scriptPath || !installCapability.manualInstallSupported || !manualInstallerFilePath) {
+    logger.info(
+      `[auto-update] manual install unavailable (supported=${installCapability.manualInstallSupported}, script=${scriptPath ?? "none"}, installer=${manualInstallerFilePath ?? "none"}): open installer instead`,
+    );
+    await openDownloadedInstaller();
+    return;
+  }
+
+  if (menuState.kind !== "update-downloaded" || !manualInstallerVersion) {
+    logger.warn(`[auto-update] ignore manual install request: state=${menuState.kind}`);
+    return;
+  }
+
+  if (manualUpdateInstallInFlight) {
+    logger.info("[auto-update] manual install already in flight");
+    return;
+  }
+  manualUpdateInstallInFlight = true;
+  logger.info(
+    `[auto-update] user requested manual install version=${manualInstallerVersion} installer=${manualInstallerFilePath}`,
+  );
+
+  try {
+    // 这次是真装：重启后的新版本要能看到「更新后说明」，所以在这里落 pending，
+    // 而不是像纯手动拖拽那样刻意跳过（那份记录会被启动流程当成已暂存的更新）。
+    if (autoUpdaterSettingService && menuState.releaseNotes) {
+      await persistPendingPostUpdateReleaseNotes(
+        autoUpdaterSettingService,
+        menuState.releaseNotes,
+        "manual-install",
+      );
+    } else if (autoUpdaterSettingService) {
+      await clearPendingPostUpdateReleaseNotes(
+        autoUpdaterSettingService,
+        "manual-install-no-notes",
+      );
+    }
+
+    // 与 quitAndInstall 同一条前置：host/agent 子进程必须先退出，
+    // 否则脚本替换 bundle 时文件仍被占用，换完可能启动不起来。
+    await onBeforeQuitAndInstall?.();
+    await startManualUpdateInstall({
+      installerFilePath: manualInstallerFilePath,
+      scriptPath,
+    });
+  } catch (error) {
+    manualUpdateInstallInFlight = false;
+    handleAutoUpdateFailure(error, "manual install failed");
+    return;
+  }
+
+  // 脚本已经在等这个 pid 消失，这里必须真的退出；不走 electron-updater，也不做 relaunch。
+  logger.info("[auto-update] manual install prepared, quitting for bundle replacement");
+  app.quit();
+}
+
 function buildManualInstallerReadyState(
   version: string,
   releaseNotes: PostUpdateReleaseNotesPayload | null,
@@ -1655,6 +1740,7 @@ export async function initAutoUpdater(options: InitAutoUpdaterOptions = {}): Pro
   updateFeedSourceUrl = options.updateFeedSource?.url.trim();
   manualUpdateDownloadAbort?.abort();
   manualUpdateDownloadAbort = null;
+  manualUpdateInstallInFlight = false;
   manualInstallerTarget = null;
   manualInstallerFilePath = null;
 
@@ -1976,6 +2062,10 @@ export async function initAutoUpdater(options: InitAutoUpdaterOptions = {}): Pro
     // 否则弹窗按钮保持 pending，用户既看不到失败也无法重试。
     openDownloadedInstaller(),
   );
+  ipcMain.handle(PlatformChannels.InstallDownloadedUpdateInstaller, async () => {
+    // 这条命令会让应用自己退出（脚本接管替换），所以失败必须在退出前抛回 renderer。
+    await installDownloadedUpdate();
+  });
   ipcMain.handle(PlatformChannels.SkipUpdateVersion, async (_event, version: unknown) => {
     const validatedVersion = typeof version === "string" ? version.trim() : "";
     if (!validatedVersion) {
@@ -2102,12 +2192,8 @@ export function checkForUpdateMenuClick(originWindow?: BrowserWindow | null) {
     // 菜单文案已经切到“重启以更新”，如果仍只发 ready toast，
     // 用户点击系统菜单不会安装更新，而顶部按钮会安装，两个入口语义不一致。
     // 这里复用按钮背后的安装逻辑，让菜单点击真正触发重启安装；
-    // 手动安装模式没有可接管的暂存更新，改为打开已下载的安装包。
-    if (installCapability.autoInstall) {
-      void quitAndInstallUpdate();
-    } else {
-      void openDownloadedInstaller();
-    }
+    // 手动安装模式交给辅助脚本替换 bundle，换不了时退回打开已下载的安装包。
+    void installDownloadedUpdate();
     return;
   }
   if (menuState.kind === "download-progress") {
