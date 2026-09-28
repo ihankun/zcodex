@@ -121,6 +121,12 @@ export function resolveV4ModelTriggerDisplay({
     return { fullLabel, modelLabel };
   }
 
+  // 只维护了一个供应商时，厂商前缀没有区分意义反而显得冗长，直接只显示模型名。
+  const providerCount = modelGroups.filter((group) => group.items.length > 0).length;
+  if (providerCount <= 1) {
+    return { fullLabel: modelLabel, modelLabel };
+  }
+
   return {
     fullLabel,
     providerPrefix: `${normalizedProviderName}/`,
