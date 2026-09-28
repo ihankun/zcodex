@@ -242,3 +242,64 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 （上游自身的既有类型缺口），本地定制文件没有新增错误。
 
 - **fork 版本号与上游解耦**：根 `package.json` 的 `version` 就是应用版本（`build-metadata.mjs` 的 `appVersion` → electron-builder `extraMetadata.version`），因此合并上游后要顺带按 semver 决定 fork 版本：合入上游**功能版**升 minor（本次 1.0.0 → 1.1.0），只合修复升 patch，不要跟随上游的 `3.14.x` 数字。
+
+## 九、内置插件载荷本地补齐（2026-09-28 新增，可选）
+
+### 1. 为什么需要
+
+官方安装包的 `Contents/Resources/glm/packages/` 有 14 个内置插件包，开源仓库只包含
+`browser-use-plugin`、`node-repl-host`（以及非插件的 `bundled-skills`）的源码；其余 12 个
+（pdf / documents / spreadsheets / presentations / image-search / android-emulator / ios-simulator /
+plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-cua）是官方预编译资产。
+缺了载荷，源码构建的产物既不会 seed 这些插件，内置市场分片也是空的（合并目录 40 → 28 条），
+插件市场里搜不到它们。
+
+**先排除误判**：这跟 fork 版本号（1.1.0 vs 上游 3.14.x）无关，两边 `cdn-marketplace.json` 条目数相同（26）。
+判定链是「内置定义表（已在开源仓库） + 载荷（不在） → 启动 seed → 内置市场分片」。
+
+### 2. 改动清单（合并冲突时保护本地版本）
+
+| 文件                                                       | 说明                                                                                                                                                                                  |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/desktop/scripts/stage-agent-bundle.mjs`          | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE` |
+| `packages/desktop/vendor/official-plugins/README.md`（新） | 补齐方法与来源优先级说明；**该目录下的载荷全部被 `.gitignore` 忽略，不入库**                                                                                                          |
+| `.gitignore`                                               | `packages/desktop/vendor/official-plugins/*` 加 `!README.md` 例外                                                                                                                     |
+| `README.md`                                                | 打包章节新增「可选：随包带上官方的内置插件载荷」                                                                                                                                      |
+
+### 3. 必须遵守的约束
+
+- **载荷只能在清空 `glm` 之后落盘**：`stageAgentBundle()` 会 `rmSync` 重建 `glm`，所以既不能手工往
+  `bundled-agents/<平台>/glm/packages/` 里放（下次构建就没），也不能只改 `bundled-agents/...` 里的内容。
+- **来源优先级是「仓库源码 > vendor」，不能反过来**：`browser-use-plugin`、`node-repl-host` 有源码，
+  被刻意跳过（日志 `skipped vendored plugins built from source`）。若叠加 vendor 里的官方预编译副本，
+  同一目录会变成两份载荷的并集，seed 的 hash 随机器变化，dev 与打包产物行为不一致。
+- **只认带 `.zcode-plugin/plugin.json` 的目录**，与官方 seed 的候选根判定
+  （`bootstrap/bundled-plugins.ts` 的 `resolveFilesystemPluginRoot`）保持一致；`bundled-skills` 因此被自动忽略。
+- vendor 目录缺省时必须静默跳过：公开检出与 CI 没有这个目录，构建不能因此失败。
+
+### 4. 注意
+
+- 载荷要与源码里的内置定义表版本对得上（`apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts`）。
+  合并上游后应从新版官方 app 重新拷一份，否则 `requiredSeedPaths` 缺失会告警并跳过该插件（只影响单个插件）。
+- 这些是官方预编译资产，自用可以，**对外分发存在许可风险**。
+
+### 5. 实测结果（2026-09-28，官方 app 3.14.3 + fork 1.1.0）
+
+以官方 `ZCode.app` 的 `glm/packages` 为来源实测（探针：把暂存结果当打包后的
+`Resources/glm` 用，以该项目录为 cwd 调真实的 `resolveOfficialPluginRoots`）：
+
+| 指标                      | 官方 app | 本次构建 |
+| ------------------------- | -------- | -------- |
+| 内置市场分片              | 14       | 14       |
+| 合并后 `marketplace.json` | 40       | **40**   |
+| 真正落盘的插件缓存        | 16       | 13       |
+
+构成：12 个来自 vendor（+ 2 个源码构建的 browser-use / node-repl-host = 14 条内置定义），
+`bundled-skills` 无 manifest 被忽略。官方那 16 个里多出的 `document-skills`、`zcode-cua`
+是历史版本留下的旧目录（`document-skills` 已拆分为 documents/pdf/presentations/spreadsheets）。
+
+**唯一缺的插件是 `zcode-guide`**：官方载荷是 `0.3.0`（技能重组为 `skills/zcode-configuration-guide`、
+`skills/diagnosing-*`，`dynamic-workflows` 移到了 `bundled-skills`），而本仓库定义表仍按 `0.2.0`
+要求 `commands/workflow.md` 与 `skills/dynamic-workflows/*`。seed 会按设计降级：跳过该插件、
+写 `ZCODE_PLUGIN_SEED_INCOMPLETE` 告警并列出缺失文件，不影响其它插件。要对齐需同时改定义表的
+`version` 与 `requiredSeedPaths`（上游文件，合并时注意保护）。

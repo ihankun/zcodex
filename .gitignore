@@ -12,6 +12,10 @@ packages/desktop/bundled-resources/
 packages/desktop/bundled-agents/
 packages/desktop/bundled-tools/
 packages/desktop/mock-cdn/
+# 本地补齐的内置插件载荷：从官方 app 拷出的预编译资产，可能是第三方二进制，
+# 不应入库。目录内只保留 README.md（补齐方法见该文件）。
+packages/desktop/vendor/official-plugins/*
+!packages/desktop/vendor/official-plugins/README.md
 *.tsbuildinfo
 .DS_Store
 coverage/
