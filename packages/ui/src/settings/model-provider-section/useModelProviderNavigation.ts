@@ -207,7 +207,12 @@ export function useModelProviderNavigation({
               statusActive: statusProvider?.executable === true,
             };
           }),
-          ...codingPlanItems.filter((item) => isStartPlanModelProviderId(item.presetId)),
+          // Start Plan 跟随品牌入口可见性：未登录（品牌入口未展开）时不把智谱登录项塞回侧栏。
+          ...codingPlanItems.filter(
+            (item) =>
+              isStartPlanModelProviderId(item.presetId) &&
+              presetProviders.some((preset) => preset.id === item.presetId),
+          ),
         ],
       },
       {

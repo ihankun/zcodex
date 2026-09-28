@@ -15,7 +15,6 @@ import {
   type ProviderFamilyConnectionSelectionSettings,
   type ProviderFamilyDomain,
   type OAuthProviderId,
-  resolveModelProviderFamilyIdByProviderId,
   resolveModelProviderFamilySpecByProviderId,
   resolveProviderFamilyDomainFromOAuthProvider,
   ZAI_PROVIDER_ID,
@@ -166,15 +165,17 @@ function resolveBuiltinPresetOAuthProvider(
   return null;
 }
 
-function shouldShowPresetProviderForActiveOAuth(
+// 智谱品牌入口只在对应族真正可用（已连接账号）时才默认展示；
+// 未连接时不占侧栏，用户可在“添加供应商”里主动展开，连接后常驻。
+function isPresetProviderConnected(
   presetId: BuiltinModelProviderId,
-  providerFamilyDomain: ProviderFamilyDomain | null | undefined,
+  provider: ProviderSettingsFormProvider | null,
 ): boolean {
   const presetOAuthProvider = resolveBuiltinPresetOAuthProvider(presetId);
-  if (!providerFamilyDomain || !presetOAuthProvider) {
+  if (!presetOAuthProvider) {
     return true;
   }
-  return resolveModelProviderFamilyIdByProviderId(presetId) === providerFamilyDomain;
+  return provider?.accountState?.availability === "available";
 }
 
 function clearPendingProviderFamilyConnectionSelection(
@@ -311,6 +312,10 @@ export function ModelProviderSection({
   const [pendingCreatedProviderId, setPendingCreatedProviderId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [creatingProvider, setCreatingProvider] = useState(false);
+  // 用户在“添加供应商”里主动展开的智谱品牌入口；登录对应族后由 family domain 接管常驻。
+  const [revealedPresetIds, setRevealedPresetIds] = useState<ReadonlySet<BuiltinModelProviderId>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     if (
@@ -607,13 +612,32 @@ export function ModelProviderSection({
 
   const presetProviders = useMemo(
     () =>
-      PRESET_PROVIDER_SPECS.filter((preset) =>
-        shouldShowPresetProviderForActiveOAuth(preset.id, effectiveProviderFamilyDomain),
-      ).map((preset) => ({
-        ...preset,
-        provider: modelProviders.find((provider) => provider.providerId === preset.id) ?? null,
+      PRESET_PROVIDER_SPECS.flatMap((preset) => {
+        const provider =
+          modelProviders.find((candidate) => candidate.providerId === preset.id) ?? null;
+        if (
+          !revealedPresetIds.has(preset.id) &&
+          !isPresetProviderConnected(preset.id, provider)
+        ) {
+          return [];
+        }
+        return [{ ...preset, provider }];
+      }),
+    [modelProviders, revealedPresetIds],
+  );
+
+  const presetPickerEntries = useMemo(
+    () =>
+      PRESET_PROVIDER_SPECS.map((preset) => ({
+        id: preset.id,
+        label: preset.displayName,
+        logo: modelProviders.find(
+          (provider) =>
+            provider.providerId ===
+            resolveModelProviderFamilySpecByProviderId(preset.id)?.individualCodingPlanProviderId,
+        )?.config.logo,
       })),
-    [effectiveProviderFamilyDomain, modelProviders],
+    [modelProviders],
   );
 
   useEffect(() => {
@@ -1003,6 +1027,21 @@ export function ModelProviderSection({
     [createPersonalProvider, locale],
   );
 
+  // “添加供应商”里的智谱登录入口：展开对应品牌并直接打开其连接/登录详情。
+  const handleSelectPresetFromPicker = useCallback((presetId: BuiltinModelProviderId) => {
+    setInvalidProviderTarget(false);
+    setRevealedPresetIds((current) => {
+      if (current.has(presetId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.add(presetId);
+      return next;
+    });
+    setSelectedNodeKey(createPresetProviderNodeKey(presetId));
+    setTemplatePickerOpen(false);
+  }, []);
+
   const handleReorderProviderIds = useCallback(
     async (orderedGroupProviderIds: string[]) => {
       const groupProviderIdSet = new Set(orderedGroupProviderIds);
@@ -1086,7 +1125,9 @@ export function ModelProviderSection({
       {templatePickerOpen ? (
         <ProviderTemplatePicker
           templates={providerTemplates}
+          presets={presetPickerEntries}
           creating={creatingProvider}
+          onSelectPreset={handleSelectPresetFromPicker}
           onBack={() => setTemplatePickerOpen(false)}
           onCreateFromTemplate={(templateId) => {
             return handleCreateProvider({ templateId });

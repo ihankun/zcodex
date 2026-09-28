@@ -1,4 +1,5 @@
 import type { ProviderSettingsView } from "@zcode/services";
+import type { BuiltinModelProviderId } from "@zcode/shared";
 import { ArrowLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { resolveProviderTemplateName } from "@zcode/provider";
 import type { ReactNode } from "react";
@@ -17,18 +18,27 @@ import { useProviderDetailFeedback } from "./ProviderDetailFeedback.js";
 
 type ProviderTemplateCreate = (templateId: string) => Promise<void>;
 type CustomProviderCreate = (label: string) => Promise<void>;
+type ProviderTemplatePickerPreset = {
+  id: BuiltinModelProviderId;
+  label: string;
+  logo: ProviderSettingsView["providerTemplates"][number]["config"]["logo"] | undefined;
+};
 
 export function ProviderTemplatePicker({
   templates,
+  presets = [],
   onBack,
   onCreateFromTemplate,
   onCreateCustom,
+  onSelectPreset,
   creating,
 }: {
   templates: ProviderSettingsView["providerTemplates"];
+  presets?: readonly ProviderTemplatePickerPreset[];
   onBack: () => void;
   onCreateFromTemplate: ProviderTemplateCreate;
   onCreateCustom: CustomProviderCreate;
+  onSelectPreset?: (presetId: BuiltinModelProviderId) => void;
   creating: boolean;
 }) {
   const { intl, locale } = useZCodeIntl();
@@ -106,6 +116,22 @@ export function ProviderTemplatePicker({
                   onClick={() => void createWithFeedback(() => onCreateCustom(customLabel))}
                 />
               ) : null}
+              {group.id === "zhipu"
+                ? presets.map((preset) => (
+                    <ProviderTemplateCard
+                      key={`preset-${preset.id}`}
+                      label={preset.label}
+                      disabled={creating}
+                      testId={testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, `preset-${preset.id}`)}
+                      icon={
+                        <span className="flex size-9 shrink-0 items-center justify-center">
+                          <ProviderLogo logo={preset.logo} className="size-8" />
+                        </span>
+                      }
+                      onClick={() => onSelectPreset?.(preset.id)}
+                    />
+                  ))
+                : null}
               {group.templates.map((template) => {
                 const label = resolveProviderTemplateName(template.templateId, template, locale);
                 return (
