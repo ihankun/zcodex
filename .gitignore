@@ -73,3 +73,6 @@ packages/desktop/.e2e-artifacts/
 packages/desktop/.e2e-cache/
 packages/desktop/.e2e-network-capture/
 .zcode-runtime/
+
+# 工程师工具的本地工作目录（会话 history / 用户偏好 / 项目 wiki 文档），非项目源码。
+.engineer/
