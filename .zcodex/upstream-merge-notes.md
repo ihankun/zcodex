@@ -303,3 +303,51 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 要求 `commands/workflow.md` 与 `skills/dynamic-workflows/*`。seed 会按设计降级：跳过该插件、
 写 `ZCODE_PLUGIN_SEED_INCOMPLETE` 告警并列出缺失文件，不影响其它插件。要对齐需同时改定义表的
 `version` 与 `requiredSeedPaths`（上游文件，合并时注意保护）。
+
+## 八、UI 定制：Logo / 布局 / 模型设置空状态（2026-09-29）
+
+本次为纯用户可见层的 UI 定制，未改任何内部标识符、包名或协议常量。合并上游时若这些文件冲突，
+按以下本地意图处理。
+
+### 1. 设置页移除 Windows 左上角 logo
+
+- `packages/ui/src/WindowsTopLeftLogo.tsx`（删除）—— Windows 设置页左上角的品牌 logo 组件，已无引用。
+- `packages/ui/src/SettingsPage.tsx`—— 移除 `{isWindowsDesktop ? <WindowsTopLeftLogo /> : null}` 渲染与
+  对应 import。
+
+### 2. 设置页左侧菜单上移（仅 Windows，不影响 macOS/Linux）
+
+`packages/ui/src/SettingsPage.tsx`（左栏 `aside` 顶部 spacer）：
+- 原无条件 `h-12 [app-region:drag]` 占位（48px，用于标题栏拖拽区与 Windows logo 占位对齐）。
+- 现改为 `cn("[app-region:drag]", isWindowsDesktop ? "h-0" : "h-12")`：Windows 去掉该占位、菜单顶到最上；
+  macOS/Linux 保持 `h-12` 不变。窗口拖拽仍由右侧 `h-12` 标题区（`[app-region:drag]`）承担。
+- 合并冲突时注意：只改 Windows 分支，别动 mac 分支。
+
+### 3. 主页左上角：一直显示折叠侧栏图标，去掉 logo
+
+- `packages/ui/src/DesktopTopOverlay.tsx`—— Windows/Linux（`usesCustomCaptionArea`）下第一个工具按钮
+  原为「默认 logo、hover 切换到折叠侧栏图标」，现改为**恒显折叠侧栏图标**（`SidebarToggleIcon`），
+  不再显示 `logo-zai.svg`。
+- 清理了不再使用的 `appLogoUrl` 传递链：`DesktopTopOverlay.tsx`（prop 与解构）、
+  `app-shell/WorkspaceShellLayout.tsx`（解构与传参）、`app-shell/types.ts`（`WorkspaceShell` 类型定义）、
+  `App.tsx`（import 与传参）。
+- **注意**：`WorkspaceSidebarCollapsedRail.tsx` 的侧栏收起态 logo（自引用 `logo-zai.svg`）不受影响、未改动，
+  也不在待删范围。
+
+### 4. 模型设置：无配置时右侧显示空状态引导（去掉永久「加载中」）
+
+- `packages/ui/src/settings/model-provider-section/Detail.tsx`—— `if (!selectedNavItem)` 分支改为：
+  `presetLoading` 为 true（仍在加载）时显示加载卡片，否则显示空状态引导（不再一直停留在「加载中」）。
+- `packages/ui/src/settings/model-provider-section/StatusCards.tsx`—— 新增 `ModelProviderEmptyGuideCard`。
+- `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts`—— 新增 `settings.modelProvider.emptyGuide` 文案。
+
+### 合并自查
+
+```bash
+# 确认 WindowsTopLeftLogo 无残留引用
+grep -rn "WindowsTopLeftLogo" packages --include='*.ts' --include='*.tsx' --include='*.js'
+# 确认主页左侧按钮不再用 appLogoUrl（仅侧栏收起态保留 logo-zai.svg 自引用）
+grep -rn "appLogoUrl" packages/ui/src
+# 必跑验证
+pnpm --filter @zcode/ui typecheck && npx oxlint packages/ui/src
+```

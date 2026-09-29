@@ -84,7 +84,6 @@ import { useZCodeStore } from "@/store/StoreProvider.js";
 import { useTabStore } from "@/store/TabStoreProvider.js";
 import { isWorkspaceTab } from "@/store/tabStore.js";
 import type { Theme } from "@/useTheme.js";
-import { WindowsTopLeftLogo } from "@/WindowsTopLeftLogo.js";
 
 import { DesktopWindowControls } from "@/DesktopWindowControls.js";
 import { WorkspaceHelpMenuButton } from "@/WorkspaceHelpMenuButton.js";
@@ -1374,8 +1373,6 @@ export function SettingsPage({
           // 固定为单个 minmax(0, 1fr) 行，让普通设置页和内部滚动 viewer 都以窗口剩余高度为边界。
           className="relative grid h-screen min-h-full w-full grid-cols-[68px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] lg:grid-cols-[268px_minmax(0,1fr)]"
         >
-          {isWindowsDesktop ? <WindowsTopLeftLogo /> : null}
-
           {usesInlineWindowControls ? (
             <div className="absolute right-1 top-1 z-30 mt-px mr-px flex h-12 items-center gap-0.5 px-2 pointer-events-auto [app-region:no-drag]">
               {/* Windows/Linux 设置页仍保留旧 caption 下箭头，与主界面和 macOS 的帮助入口不一致。
@@ -1387,7 +1384,9 @@ export function SettingsPage({
           ) : null}
           <aside className="min-w-0">
             <div className="flex h-full flex-col">
-              <div className="h-12 [app-region:drag]"></div>
+              {/* Windows 已移除左上角 logo，顶部占位不再需要：去掉后左侧菜单可顶到最上；
+                  macOS/Linux 仍保留标题栏对齐占位，不受影响。 */}
+              <div className={cn("[app-region:drag]", isWindowsDesktop ? "h-0" : "h-12")}></div>
               <div className="px-2 pb-3 pt-3">
                 {onBack ? (
                   <ControlHintTooltip

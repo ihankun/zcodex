@@ -35,7 +35,6 @@ interface DesktopTopOverlayProps {
   canGoBack: boolean;
   canGoForward: boolean;
   showNewTaskButton?: boolean;
-  appLogoUrl: string;
   platform: IPlatformService;
   onToggleSidebar: () => void;
   onCreateTask: () => void;
@@ -65,7 +64,6 @@ export function DesktopTopOverlay({
   canGoBack: _canGoBack,
   canGoForward: _canGoForward,
   showNewTaskButton,
-  appLogoUrl,
   platform,
   onToggleSidebar,
   onCreateTask,
@@ -136,16 +134,9 @@ export function DesktopTopOverlay({
               title={toggleSidebarTitle}
               shortcut={toggleSidebarShortcutLabel}
               ariaLabel={toggleSidebarTitle}
-              buttonClassName="group relative overflow-hidden rounded-lg"
               onClick={onToggleSidebar}
             >
-              <img
-                src={appLogoUrl}
-                alt="ZCode"
-                className="size-5 transition-opacity duration-150 group-hover:opacity-0"
-                draggable={false}
-              />
-              <SidebarToggleIcon className="absolute inset-0 m-auto size-4 opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
+              <SidebarToggleIcon className="size-4" />
             </DesktopTopOverlayActionButton>
           )}
 

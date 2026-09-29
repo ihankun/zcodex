@@ -28,6 +28,7 @@ import {
 import { InlineEditableProviderCard } from "./InlineEditableProviderCard.js";
 import {
   ModelProviderLoadingCard,
+  ModelProviderEmptyGuideCard,
   PresetProviderPlaceholderCard,
   CodingPlanStatusPanel,
 } from "./StatusCards.js";
@@ -391,7 +392,13 @@ export function ModelProviderSectionDetail({
   }, [selectedItemKey]);
 
   if (!selectedNavItem) {
-    return <ModelProviderLoadingCard loadingLabel={loadingLabel} />;
+    // 首刷加载进行时保持“加载中”，避免把慢网误判成无配置；
+    // 加载结束后仍无可选导航项（默认无模型配置）时展示空状态引导，不再一直停留在“加载中”。
+    return presetLoading ? (
+      <ModelProviderLoadingCard loadingLabel={loadingLabel} />
+    ) : (
+      <ModelProviderEmptyGuideCard />
+    );
   }
 
   if (selectedNavItem.type === "preset") {
