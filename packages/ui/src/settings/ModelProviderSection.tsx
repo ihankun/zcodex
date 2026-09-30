@@ -615,10 +615,7 @@ export function ModelProviderSection({
       PRESET_PROVIDER_SPECS.flatMap((preset) => {
         const provider =
           modelProviders.find((candidate) => candidate.providerId === preset.id) ?? null;
-        if (
-          !revealedPresetIds.has(preset.id) &&
-          !isPresetProviderConnected(preset.id, provider)
-        ) {
+        if (!revealedPresetIds.has(preset.id) && !isPresetProviderConnected(preset.id, provider)) {
           return [];
         }
         return [{ ...preset, provider }];

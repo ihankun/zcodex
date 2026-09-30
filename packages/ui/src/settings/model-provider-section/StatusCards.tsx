@@ -114,7 +114,11 @@ export function ModelProviderLoadingCard({ loadingLabel }: { loadingLabel: strin
   );
 }
 
-export function ModelProviderEmptyGuideCard({ messageId = "settings.modelProvider.emptyGuide" }: { messageId?: string }) {
+export function ModelProviderEmptyGuideCard({
+  messageId = "settings.modelProvider.emptyGuide",
+}: {
+  messageId?: string;
+}) {
   const { intl } = useZCodeIntl();
 
   return (

@@ -387,9 +387,7 @@ export function ModelProviderSectionNavigation({
     <aside className="px-1.5 py-3 md:py-2 md:px-2">
       <div className="flex min-h-0 flex-col gap-3 max-md:gap-1">
         {navigationGroups
-          .filter(
-            (group) => group.items.length > 0 || (group.id === "preset" && presetLoading),
-          )
+          .filter((group) => group.items.length > 0 || (group.id === "preset" && presetLoading))
           .map((group) => (
             <div key={group.id} className="flex flex-col gap-2 max-md:gap-1">
               <div className="flex h-7 items-center justify-between px-2 py-1 max-md:hidden">

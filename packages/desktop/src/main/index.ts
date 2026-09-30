@@ -1487,6 +1487,10 @@ function syncUpdateStatusWindowChrome(win: BrowserWindow) {
 }
 
 function resolveUpdateStatusWindowHeight(state: UpdateStatePayload) {
+  // 本地新增。返回值与末尾 fallthrough 相同，看似冗余，但它是**类型收窄守卫**：
+  // releaseNotes / manualInstaller 只存在于 update-available、update-downloaded 变体上，
+  // 先把 idle/checking 提前返回剔出联合类型，下面的 state.releaseNotes 才能通过收窄。
+  // 删掉它 tsc 会在 `state.releaseNotes` 报 TS2339（主进程类型检查 86 → 87）。
   if (state.kind === "idle" || state.kind === "checking") {
     return UPDATE_STATUS_WINDOW_COMPACT_HEIGHT;
   }

@@ -94,8 +94,8 @@
     （`Root.tsx` 的 `!workspaceShellPath ? (isSettingsTabActive ? <SettingsPage/> : null) : …`）。
     也就是说：**侧边栏只可能出现在上游条件已经放行的状态里**，被多放行出来的
     「无 workspace + 非设置页 + 非欢迎页」状态下主内容区渲染 `null`，没有侧边栏可供发黑。
-  回退后该文件与上游逐字节一致，合并时不必再裁决。毛玻璃效果本身是有意保留的，
-  不要给侧边栏容器加不透明背景。
+    回退后该文件与上游逐字节一致，合并时不必再裁决。毛玻璃效果本身是有意保留的，
+    不要给侧边栏容器加不透明背景。
 - **macOS 的 Dock 图标：`applyAppIcon` 只能用于未打包态（2026-09-30 定案）。**
   这里曾经整体删掉 `applyAppIcon()` 的调用，理由写作「`app.dock.setIcon` 覆盖 Dock 图标导致
   丢失 macOS 系统渲染的光泽」。这个理由与实际资源不符：`build/icon.icns` 里的 1024px 表示与
@@ -109,6 +109,18 @@
   再无其他调用点）。
   所以正确形态是 `if (!app.isPackaged) applyAppIcon(iconPath);`：打包态走 bundle 的 `.icns`，
   开发态保留产品 logo。上游若改动这段启动逻辑，保留这个条件判断即可。
+- **`resolveUpdateStatusWindowHeight` 里 `idle || checking` 那个早返回不能删（看着冗余，实为类型收窄守卫）。**
+  它返回的值与函数末尾的 fallthrough 完全相同，很容易被当成「等价的多余分支」清掉。
+  但它真正的作用是把 `idle` / `checking` 提前从 `UpdateStatePayload` 联合类型里剔出去：
+  `releaseNotes` 只声明在 `update-available`（`manualInstaller` 只在 `update-downloaded`）上，
+  少了这一步收窄，下面的 `state.releaseNotes` 会报
+  `TS2339: Property 'releaseNotes' does not exist on type '{ kind: "idle"; … }'`，
+  主进程类型检查从 86 变 87。删除时**必须**跑
+  `pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit` 对比 86 这个基线，
+  根 `pnpm typecheck` 覆盖不到 main 进程，看不出这个回归。
+  注意这个函数整体是本地改过的（上游只有 download-progress / update-downloaded 两个分支），
+  三个新增分支（idle-or-checking 收窄、releaseNotes 加高、manualInstaller 加高）都是第七节
+  「更新窗口高度」的一部分，合并时需要整体保留。
 - **不要为了让毛玻璃跟随主题去手写 `nativeTheme.themeSource` 兜底或重建 vibrancy。**
   Electron 的 `nativeTheme.themeSource` 在 macOS 上会直接设置 `NSApp.appearance`
   （`UpdateMacOSAppearanceForOverrideValue`），窗口与 `NSVisualEffectView` 立即跟随，
@@ -267,6 +279,16 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 1. 上游新文件**不跑 oxfmt**。合并后 `pnpm fmt:check` 从 1 个失败文件（`packages/desktop/src/main/desktopRuntimeEnv.ts`，本地既有）变成 33 个，其中 31 个是上游新文件原样带入（`bots/**`、`BotsDialog/**` 等）。
    **不要**为了 `fmt:check` 去格式化这些上游文件，否则每次合并都会在这些文件上产生冲突；只格式化本地改动的文件。
    同上，`README.md` 上游版本本身也不是 oxfmt 干净的，不要顺手格式化。
+   **当前基线（2026-09-30 复查）：`pnpm fmt:check` 失败 32 个，全部是「上游本来就失败、我们没碰过」的文件。**
+   判断某个失败文件该不该格式化，用这条命令，输出为空才说明本地文件都干净：
+
+   ```bash
+   # 失败清单 ∩ 我们改过/新增的文件 = 需要格式化的（README.md 例外）
+   comm -12 \
+     <(pnpm fmt:check 2>&1 | grep -E '\([0-9]+m?s\)$' | sed -E 's/ \([0-9]+m?s\)$//' | sort) \
+     <(git diff --name-only 29628c9 -- . ':(exclude)packages/desktop/vendor' | sort)
+   ```
+
 2. 上游改写 `packages/desktop/src/main/index.ts` 时，本地三项定制都保留：`ZCODE_PRODUCT_FLAVOR` 导入（第三节踩坑）、
    force-gate 启动调用保持删除、`initAutoUpdater({ ..., updateFeedSource })` 参数保持本地版本（不再有 `deviceMid` / `resolveEndpointOrigin`）。
 
@@ -300,27 +322,27 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 `packages/desktop/vendor/official-plugins/` 的 61MB 里只有约 2.2MB 真正会被打包，
 其余是**永远用不到的死载荷**，故不入库（`.gitignore` 逐条排除）：
 
-| 排除项 | 体积 | 原因 |
-| --- | --- | --- |
-| `browser-use-plugin`、`node-repl-host` | 38M | 仓库 `apps/zcode-cli/packages/` 下有源码，`stageVendoredOfficialPlugins` 按「仓库源码 > vendor」跳过 vendor 副本；入库只会让同一插件出现两份载荷 |
-| `bundled-skills` | 152K | 不是插件（无 `.zcode-plugin/plugin.json`），由源码单独 stage |
-| `*/node_modules` | 18M | 平台专有原生二进制（`zcode-cua-plugin` 下的 darwin `libvips`/`koffi`/`sharp`），其他平台加载不了；且入库载荷不含它、本地含它会让同一插件算出两份 seed hash |
+| 排除项                                 | 体积 | 原因                                                                                                                                                       |
+| -------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `browser-use-plugin`、`node-repl-host` | 38M  | 仓库 `apps/zcode-cli/packages/` 下有源码，`stageVendoredOfficialPlugins` 按「仓库源码 > vendor」跳过 vendor 副本；入库只会让同一插件出现两份载荷           |
+| `bundled-skills`                       | 152K | 不是插件（无 `.zcode-plugin/plugin.json`），由源码单独 stage                                                                                               |
+| `*/node_modules`                       | 18M  | 平台专有原生二进制（`zcode-cua-plugin` 下的 darwin `libvips`/`koffi`/`sharp`），其他平台加载不了；且入库载荷不含它、本地含它会让同一插件算出两份 seed hash |
 
 `zcode-cua-plugin` 的 `node_modules` 尤其没有价值：它只含 sharp/koffi 等，连它 `package.json`
 声明的 `@zcode/zcode-cua` 都没有，而该包在本仓库是 fail-closed 占位
-（`packages/zcode-cua/package.json`：*ships without Computer Use*）；其 client script
+（`packages/zcode-cua/package.json`：_ships without Computer Use_）；其 client script
 （`scripts/computer-use-client.mjs`）只 import Node 内置模块，不引用任何原生依赖。
 
 ### 2. 改动清单（合并冲突时保护本地版本）
 
-| 文件                                                       | 说明                                                                                                                                                                                  |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/desktop/scripts/stage-agent-bundle.mjs`          | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE`；新增 `excludedVendoredPluginAssetNames`（`.DS_Store` + `node_modules`）与 `shouldCopyVendoredPluginAsset` |
-| `packages/desktop/vendor/official-plugins/**`（新，12 个插件载荷入库） | 仓库没有源码的内置插件预编译资产，随仓库分发以保证任意平台打包都带插件                                                                                                     |
-| `packages/desktop/vendor/official-plugins/README.md`（新） | 入库范围、升级上游后重新对齐载荷的方法、来源优先级与许可说明                                                                                                                          |
-| `.gitignore`                                               | 逐条排除 `browser-use-plugin/`、`node-repl-host/`、`bundled-skills/`、`*/node_modules/`（见 1.1）；不再整目录忽略。**并保留 `!…/*/dist/` 与 `!…/*/dist/**` 两条 re-include**：顶层 `dist/` 会连目录排除，而 android-emulator / ios-simulator 的 `dist/mcp/server.js` 是运行必需产物 |
-| `.oxlintrc.json`、`.prettierignore`、`knip.json`              | 把 `packages/desktop/vendor/official-plugins` 排除出 lint/fmt/未使用检查：第三方产物不该被格式化或当作项目源码分析，否则每次重新拷载荷都产生无意义 diff |
-| `README.md`                                                | 打包章节的「可选：随包带上官方的内置插件载荷」改为「内置插件载荷」，说明已入库                                                                                                        |
+| 文件                                                                   | 说明                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/desktop/scripts/stage-agent-bundle.mjs`                      | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE`；新增 `excludedVendoredPluginAssetNames`（`.DS_Store` + `node_modules`）与 `shouldCopyVendoredPluginAsset` |
+| `packages/desktop/vendor/official-plugins/**`（新，12 个插件载荷入库） | 仓库没有源码的内置插件预编译资产，随仓库分发以保证任意平台打包都带插件                                                                                                                                                                                                                           |
+| `packages/desktop/vendor/official-plugins/README.md`（新）             | 入库范围、升级上游后重新对齐载荷的方法、来源优先级与许可说明                                                                                                                                                                                                                                     |
+| `.gitignore`                                                           | 逐条排除 `browser-use-plugin/`、`node-repl-host/`、`bundled-skills/`、`*/node_modules/`（见 1.1）；不再整目录忽略。**并保留 `!…/*/dist/` 与 `!…/\*/dist/**`两条 re-include**：顶层`dist/`会连目录排除，而 android-emulator / ios-simulator 的`dist/mcp/server.js` 是运行必需产物                 |
+| `.oxlintrc.json`、`.prettierignore`、`knip.json`                       | 把 `packages/desktop/vendor/official-plugins` 排除出 lint/fmt/未使用检查：第三方产物不该被格式化或当作项目源码分析，否则每次重新拷载荷都产生无意义 diff                                                                                                                                          |
+| `README.md`                                                            | 打包章节的「可选：随包带上官方的内置插件载荷」改为「内置插件载荷」，说明已入库                                                                                                                                                                                                                   |
 
 ### 3. 必须遵守的约束
 
@@ -384,6 +406,7 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 ### 2. 设置页左侧菜单上移（仅 Windows，不影响 macOS/Linux）
 
 `packages/ui/src/SettingsPage.tsx`（左栏 `aside` 顶部 spacer）：
+
 - 原无条件 `h-12 [app-region:drag]` 占位（48px，用于标题栏拖拽区与 Windows logo 占位对齐）。
 - 现改为 `cn("[app-region:drag]", isWindowsDesktop ? "h-0" : "h-12")`：Windows 去掉该占位、菜单顶到最上；
   macOS/Linux 保持 `h-12` 不变。窗口拖拽仍由右侧 `h-12` 标题区（`[app-region:drag]`）承担。
