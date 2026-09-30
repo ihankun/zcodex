@@ -51,10 +51,14 @@
 
 ### 3. 启动强制升级 gate（已禁用）
 
-- `packages/desktop/src/main/index.ts` — 删除了 `maybeBlockStartupForForceUpdate` 的启动调用（保留 `forceUpdateGuard.ts` 本体）。原因：fork 版本号独立演进，必然低于上游线上 `minimalVersion`，gate 会永久拦截启动。上游更新此段启动逻辑时，不要恢复该调用。
+- `packages/desktop/src/main/index.ts` — 删除了 `maybeBlockStartupForForceUpdate` 的启动调用。原因：fork 版本号独立演进（1.x），必然低于上游线上 release 下发的 `minimalVersion`，gate 会永久拦截启动。上游更新此段启动逻辑时，**不要恢复该调用**。
+- `packages/desktop/src/main/forceUpdateGuard.ts`（254 行）、`forceUpdatePrompt.ts`（641 行）—— **刻意保留为不可达代码**，不要因为「全仓没有调用点」就删（2026-09-30 复核过，结论与直觉相反）：
+  - 保留 = 与上游逐字节一致，上游改这两个文件时零冲突；删除 = 上游每次碰它们都产生 delete/modify 冲突。
+  - 守卫并未损坏：它读的是 `/api/v1/client/configs`（`DEFAULT_ZCODE_ENDPOINT_ORIGIN`），**不依赖**已删除的 `manifestUpdateProvider`；弹窗文案内联在 `forceUpdatePrompt.ts` 自己的 `messages` 里，也没占用 i18n locales。
+  - 删除会级联：`autoUpdater.ts` 的 `requestForceAutoUpdate` 唯一消费者就是这个守卫，删后它立刻变死代码 —— 而 `autoUpdater.ts` 是本地改动最重的文件（见第七节），不该再动它；`@zcode/shared` 的 `getForceUpdateMinimalVersionFromConfig` / `resolveForceUpdateRequirement` / `ForceUpdateRequirement` 也要跟着清理。
+  - 已知代价：`pnpm knip` 会一直把这两个文件列进 unused files（基线噪音），这是接受它的理由。
 - `packages/desktop/build/dmg_background.png` 与 `dmg_background@2x.png` — DMG 安装界面背景图，文字由 ZCODE 重绘为 ZCODEX（PIL 生成，保留箭头与装饰图标）。上游更新此图后需重新处理文字。
-- `packages/desktop/src/main/desktopWindowChrome.ts` — 删除了 `applyAppIcon()`（启动时 `app.dock.setIcon` 覆盖 Dock 图标，导致丢失 macOS 系统渲染的图标光泽）。上游更新此段启动逻辑时，不要恢复该调用。
-- `packages/ui/src/Root.tsx` — `canEnterNativeThemeSyncSurface` 简化为 `!isStartupRenderBlocked`（上游原条件要求 workspaceShellPath/isSettingsTabActive/welcome 之一命中）。原因：主题是应用级偏好，不属于某个 workspace/设置页，"已进主界面但未打开任何项目"的空态在上游条件下不会同步 `nativeTheme.themeSource`，侧边栏毛玻璃（vibrancy）会跟随系统外观而与内容主题不一致（系统深色 + 应用浅色时侧边栏发黑）。注意毛玻璃效果是有意保留的，不要给侧边栏容器加不透明背景。上游改动此启动条件时需重新评估。
+- `packages/desktop/src/main/index.ts` — `applyAppIcon(iconPath)` 只在 `!app.isPackaged` 时调用（上游是无条件调用）。`desktopWindowChrome.ts` 已恢复为与上游逐字节一致，不必再裁决；原因见第三节「Dock 图标」条。
 
 ## 三、踩坑记录（不要再重复）
 
@@ -67,14 +71,44 @@
   ① 窗口只能由 `activate`（点 Dock）兜底创建，看起来"应用在后台、点 Dock 才显示"；
   ② renderer 侧所有 `ipcRenderer.invoke` 通道都报 `No handler registered`，
   其中 `PlatformCmd.SetTitleBarTheme` 失效 ⇒ `nativeTheme.themeSource` 不再随
-  应用主题同步 ⇒ 浅色主题下侧边栏毛玻璃仍是深色、"跟随系统"也会被主进程里
-  写死的兜底值钉住。
+  应用主题同步 ⇒ 浅色主题下侧边栏毛玻璃仍是深色。注意主进程**没有**任何写死的
+  主题兜底值：`themeSource` 全仓只有 `desktopMainIpcPlatform.ts` 里这一个写入点，
+  handler 失效时它停留在 Electron 默认的 `"system"`，于是窗口 vibrancy 与
+  Windows 标题栏跟随系统外观、而内容仍按应用主题渲染，两者不一致。
   验证方法：启动日志出现 `[error] [main] unhandledRejection` 且
   `[primary-window] creating main window (app-activate)`（正常应为 `app-ready`）。
   注意根 `pnpm typecheck` 只构建 `packages/desktop/tsconfig.host.json`，不覆盖
   `tsconfig.main.json`（Electron main/preload/renderer），所以这个错误不会被现有
   检查拦住；改动 main 进程后建议单独跑
   `pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit`。
+- **不要再给 `Root.tsx` 的 `canEnterNativeThemeSyncSurface` 加特例（2026-09-30 已回退为上游条件）。**
+  该条件曾经被本地简化为 `!isStartupRenderBlocked`，理由写作「无 workspace 的空态不同步
+  `nativeTheme.themeSource`，侧边栏毛玻璃发黑」。这个理由是误诊，且现象在该状态下**不可达**：
+  - `nativeTheme.themeSource` 全仓只有一个写入点，即渲染进程的 `SetTitleBarTheme`
+    handler（`desktopMainIpcPlatform.ts`），主进程没有任何初始值或兜底；它唯一的驱动者是
+    `useDesktopNativeThemeSync`，而后者由 `Root.tsx` 的 `hasEnteredNativeThemeSyncSurface`
+    单向 latch 控制 —— 所以上面第 1 条那个导入缺失 bug 会让它在**所有**界面状态失效，
+    不只是空态，那才是当时看到「毛玻璃发黑」的真因。
+  - 侧边栏只挂在 `WorkspaceShellLayout.tsx` 里，而 `WorkspaceShellLayout` ← `App` ←
+    `RootWorkspaceContent`，后者只在 `workspaceShellPath` 有值时渲染
+    （`Root.tsx` 的 `!workspaceShellPath ? (isSettingsTabActive ? <SettingsPage/> : null) : …`）。
+    也就是说：**侧边栏只可能出现在上游条件已经放行的状态里**，被多放行出来的
+    「无 workspace + 非设置页 + 非欢迎页」状态下主内容区渲染 `null`，没有侧边栏可供发黑。
+  回退后该文件与上游逐字节一致，合并时不必再裁决。毛玻璃效果本身是有意保留的，
+  不要给侧边栏容器加不透明背景。
+- **macOS 的 Dock 图标：`applyAppIcon` 只能用于未打包态（2026-09-30 定案）。**
+  这里曾经整体删掉 `applyAppIcon()` 的调用，理由写作「`app.dock.setIcon` 覆盖 Dock 图标导致
+  丢失 macOS 系统渲染的光泽」。这个理由与实际资源不符：`build/icon.icns` 里的 1024px 表示与
+  `build/icon.png` **逐像素完全相同**（electron-builder 直接拿这张 PNG 生成 icns），而这张 PNG
+  本来就已经带圆角方块＋投影、alpha 干净。两条路径喂给系统的 artwork 是同一份，不存在
+  「换图丢失光泽」的机制。
+  但**整体删除**有确定的副作用：开发态 app bundle 是
+  `node_modules/electron/dist/Electron.app` 的原样拷贝（`devElectronAppBundle.mjs` 只 patch
+  Info.plist 的显示名/包名/URL scheme，不写图标），`CFBundleIconFile` 仍是 `electron.icns`，
+  删掉调用后 `pnpm dev:desktop` 的 Dock 显示 Electron 默认图标（全仓 `app.dock.setIcon`
+  再无其他调用点）。
+  所以正确形态是 `if (!app.isPackaged) applyAppIcon(iconPath);`：打包态走 bundle 的 `.icns`，
+  开发态保留产品 logo。上游若改动这段启动逻辑，保留这个条件判断即可。
 - **不要为了让毛玻璃跟随主题去手写 `nativeTheme.themeSource` 兜底或重建 vibrancy。**
   Electron 的 `nativeTheme.themeSource` 在 macOS 上会直接设置 `NSApp.appearance`
   （`UpdateMacOSAppearanceForOverrideValue`），窗口与 `NSVisualEffectView` 立即跟随，

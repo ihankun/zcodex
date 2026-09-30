@@ -131,6 +131,7 @@ import {
 import { resolveWindowsAppUserModelIdForFlavor } from "../../scripts/desktop-product-identity.mjs";
 import type { DesktopWindowSize } from "./desktopWindowSize.js";
 import { maybeWarnArchitectureMismatch } from "./desktopArchitectureGuard.js";
+import { applyAppIcon } from "./desktopWindowChrome.js";
 import { createWindowsDesktopTray, updateWindowsDesktopTrayMenu } from "./desktopTray.js";
 import { createWindowsCuaOperationIndicator } from "./windowsCuaOperationIndicator.js";
 import {
@@ -1994,6 +1995,18 @@ app.whenReady().then(async () => {
     app.setAppUserModelId(
       resolveWindowsAppUserModelIdForFlavor(ZCODE_PRODUCT_FLAVOR, { isPackaged: app.isPackaged }),
     );
+  }
+
+  // 本地定制（ZCodex fork）：只在未打包时覆盖 Dock 图标。
+  // 打包态的 Dock 图标由 bundle 自带的 Contents/Resources/icon.icns 决定，交给 macOS 走
+  // 标准渲染路径；而 build/icon.icns 与 build/icon.png 是同一份像素（PIL 逐像素比对为 0），
+  // 所以额外 setIcon 只会让 Dock 走 setApplicationIconImage 这条旁路、和 bundle 图标的渲染
+  // 结果对不齐，没有收益。
+  // 开发态则必须调用：dev bundle 是 node_modules/electron/dist/Electron.app 的原样拷贝
+  // （devElectronAppBundle.mjs 只 patch Info.plist 的显示名/包名/URL scheme，不写图标），
+  // CFBundleIconFile 仍是 electron.icns，不覆盖就只能看到 Electron 默认图标。
+  if (!app.isPackaged) {
+    applyAppIcon(iconPath);
   }
 
   if (!loadedBootstrapLocale) {
