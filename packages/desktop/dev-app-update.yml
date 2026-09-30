@@ -1,5 +1,5 @@
 # 修复原因：显式开启开发态自动更新时 electron-updater 会读取 dev-app-update.yml 初始化下载缓存。
-# 真实清单与安装包地址由 GitHubReleaseUpdateProvider 提供（见 .zcodex/upstream-merge-notes.md 第七节），
+# 真实清单与安装包地址由 GitHubReleaseUpdateProvider 提供（见 .zcodex/upstream-merge-notes.md 2.5），
 # 这里的 generic url 只作为本地配置占位。
 provider: generic
 url: http://localhost:8081
