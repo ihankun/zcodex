@@ -83,25 +83,38 @@ done
   一旦随构建产物对外分发，属于再分发官方二进制，存在版权与许可风险，需要自行确认。
 - 载荷版本要与源码里的内置插件定义表对得上
   （`apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts` 的 `version` 与
-  `requiredSeedPaths`）。版本不一致时**不会**报错构建，而是该插件被 seed 跳过并在日志里告警
-  （`ZCODE_PLUGIN_SEED_INCOMPLETE`，附带缺失文件清单），其余插件不受影响。
+  `requiredSeedPaths`）。两个门的作用不同，改载荷时**必须一起改**：
+  - `requiredSeedPaths` 缺任一项 → 该插件被 seed 跳过并在日志里告警
+    （`ZCODE_PLUGIN_SEED_INCOMPLETE`，附带缺失文件清单），其余插件不受影响；
+  - `version` 决定插件缓存目录名 `cache/<marketplace>/<name>/<version>`，也被 SEA 清单按名精确匹配。
+  - 当前 `zcode-guide` 已按入库的 0.3.0 载荷对齐（`version: "0.3.0"` + 6 篇技能正文）；
+    这一处改的是上游文件，合并时注意保护。
 - 本目录在 `.oxlintrc.json` 与 `.prettierignore` 里被排除：它们是第三方产物，
   **不要**为了 `fmt:check` / `lint` 去格式化或修补，否则每次从官方 app 重新拷一份都会产生无意义 diff。
 
-## 实测结论（2026-09-28，官方 app 3.14.3 + fork 1.1.0）
+## 实测结论
 
-以官方 `ZCode.app` 的 `glm/packages` 为来源时：
+**2026-09-28（官方 app 3.14.3 + fork 1.1.0，定义表尚未对齐）** 以官方 `ZCode.app` 的
+`glm/packages` 为来源时：
 
 - 暂存 12 个：android-emulator、documents、image-search、ios-simulator、pdf、plugin-creator、
   presentations、restore-legacy-sessions、skill-creator、spreadsheets、zcode-cua、zcode-guide；
   跳过 2 个（源码构建的 browser-use、node-repl-host），非插件的 `bundled-skills` 忽略；
 - 走一遍真实 seed（`resolveOfficialPluginRoots`）：内置市场分片 14 条，
   合并后的 `marketplace.json` **40 条**，与官方安装包的 40 条一致；
-- 有 13 个插件真正落进插件缓存。`zcode-guide` 被跳过：官方载荷是 `0.3.0`（技能重组为
-  `skills/zcode-configuration-guide`、`skills/diagnosing-*`，`dynamic-workflows` 已移到
-  `bundled-skills`），而本仓库定义表仍按 `0.2.0` 要求 `commands/workflow.md` 与
-  `skills/dynamic-workflows/*`。要对齐需同步更新定义表的 `version` 与 `requiredSeedPaths`
-  （改动的是上游文件，合并时注意保护）。
+- 有 13 个插件真正落进插件缓存，`zcode-guide` 被跳过（当时定义表按 `0.2.0` 要求
+  `commands/workflow.md` 与 `skills/dynamic-workflows/*`，与 0.3.0 载荷对不上）。
+
+**2026-09-30（定义表已对齐）** 同一探针，源码构建的两个插件也一起 stage：
+
+```
+vendor 载荷暂存：12 个（跳过 browser-use-plugin, node-repl-host）
+最终落进缓存的插件：14 个
+ZCODE_PLUGIN_SEED_INCOMPLETE 告警：0 条
+  zcode-guide 缓存版本目录：0.3.0
+```
+
+即 14 条内置定义全部落盘，不再有被跳过的插件。
 - `zcode-cua-plugin` 依赖的 `@zcode/zcode-cua` 在本仓库是 fail-closed 占位包
   （见 `packages/zcode-cua/package.json`），即 Computer Use 在本构建里不工作；
   入库的 cua 载荷只带 docs/skills/client script，不含官方 `node_modules`。

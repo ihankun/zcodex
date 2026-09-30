@@ -5,7 +5,7 @@
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
 > `git diff 29628c9 dev -- . ':(exclude)packages/desktop/vendor'` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（home 目录改名）与真正的行为改动分开
-> （2026-09-30 实测：143 个修改文件中 99 个只改了字样）。
+> （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
 > 最近复核：2026-09-30。
 
 ## 一、概览
@@ -19,11 +19,12 @@
 | 桌面自动更新改走 GitHub Release，未签名构建回退手动安装 | desktop + shared + client + ui + web + 构建 | 2.5  |
 | 内置插件载荷入库                                        | 构建流程与产物                              | 2.6  |
 
-**改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面三处**改了内部行为**，合并时最容易出事：
+**改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面四处**改了内部行为**，合并时最容易出事：
 
 - 启动强制升级 gate 已禁用（2.4.1）
 - 桌面自动更新不再读服务端 manifest，改读 GitHub Release（2.5）
 - home 数据目录改名，且 user 级与项目级作用域要分开处理（2.2）
+- 内置插件的 seed 结果随定义表变化：入库载荷 + 对齐后的 `official-plugin-definitions.ts`（2.6）
 
 **明确未改的内部标识符**：npm 包名、`ZCODE_*` 环境变量名、CLI 命令名、IPC 通道名、协议常量、深链 scheme、项目内 `<项目>/.zcode/` 目录。清单见第四节。
 
@@ -250,14 +251,15 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 
 #### 改动清单（合并冲突时保护本地版本）
 
-| 文件                                                                   | 说明                                                                                                                                                                                                                                                                                             |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/desktop/scripts/stage-agent-bundle.mjs`                      | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE`；新增 `excludedVendoredPluginAssetNames`（`.DS_Store` + `node_modules`）与 `shouldCopyVendoredPluginAsset` |
-| `packages/desktop/vendor/official-plugins/**`（新，12 个插件载荷入库） | 仓库没有源码的内置插件预编译资产，随仓库分发以保证任意平台打包都带插件                                                                                                                                                                                                                           |
-| `packages/desktop/vendor/official-plugins/README.md`（新）             | 入库范围、升级上游后重新对齐载荷的方法、来源优先级与许可说明                                                                                                                                                                                                                                     |
-| `.gitignore`                                                           | 逐条排除 `browser-use-plugin/`、`node-repl-host/`、`bundled-skills/`、`*/node_modules/`；不再整目录忽略。**并保留 `!…/*/dist/` 与 `!…/\*/dist/**`两条 re-include**：顶层`dist/`会连目录排除，而 android-emulator / ios-simulator 的`dist/mcp/server.js` 是运行必需产物                           |
-| `.oxlintrc.json`、`.prettierignore`、`knip.json`                       | 把 `packages/desktop/vendor/official-plugins` 排除出 lint/fmt/未使用检查：第三方产物不该被格式化或当作项目源码分析，否则每次重新拷载荷都产生无意义 diff                                                                                                                                          |
-| `README.md`                                                            | 打包章节的「可选：随包带上官方的内置插件载荷」改为「内置插件载荷」，说明已入库                                                                                                                                                                                                                   |
+| 文件                                                                       | 说明                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/desktop/scripts/stage-agent-bundle.mjs`                          | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE`；新增 `excludedVendoredPluginAssetNames`（`.DS_Store` + `node_modules`）与 `shouldCopyVendoredPluginAsset`                                       |
+| `packages/desktop/vendor/official-plugins/**`（新，12 个插件载荷入库）     | 仓库没有源码的内置插件预编译资产，随仓库分发以保证任意平台打包都带插件                                                                                                                                                                                                                                                                 |
+| `packages/desktop/vendor/official-plugins/README.md`（新）                 | 入库范围、升级上游后重新对齐载荷的方法、来源优先级与许可说明                                                                                                                                                                                                                                                                           |
+| `.gitignore`                                                               | 逐条排除 `browser-use-plugin/`、`node-repl-host/`、`bundled-skills/`、`*/node_modules/`；不再整目录忽略。**并保留 `!…/*/dist/` 与 `!…/\*/dist/**`两条 re-include**：顶层`dist/`会连目录排除，而 android-emulator / ios-simulator 的`dist/mcp/server.js` 是运行必需产物                                                                 |
+| `.oxlintrc.json`、`.prettierignore`、`knip.json`                           | 把 `packages/desktop/vendor/official-plugins` 排除出 lint/fmt/未使用检查：第三方产物不该被格式化或当作项目源码分析，否则每次重新拷载荷都产生无意义 diff                                                                                                                                                                                |
+| `README.md`                                                                | 打包章节的「可选：随包带上官方的内置插件载荷」改为「内置插件载荷」，说明已入库                                                                                                                                                                                                                                                         |
+| `apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts` | **zcode-guide 的 `version` 与 `requiredSeedPaths` 已按入库的 0.3.0 载荷对齐**（`0.2.0` → `0.3.0`；4 个旧路径 `commands/workflow.md` + `skills/dynamic-workflows/*` → 6 篇技能正文）。这是 2.6 这组改动里唯一改到的上游源码文件，合并时**必须**保住这三个值，否则该插件又被 seed 跳过（见下方实测结果与「定义表与入库载荷必须对齐」条） |
 
 #### 必须遵守的约束
 
@@ -277,10 +279,16 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 
 #### 注意
 
-- 载荷要与源码里的内置定义表版本对得上（`apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts`）。合并上游后应从新版官方 app 重新拷一份，否则 `requiredSeedPaths` 缺失会告警并跳过该插件（只影响单个插件）。**只覆盖上一个表里那 12 个目录**，不要把 `browser-use-plugin`、`node-repl-host`、`bundled-skills` 或插件内的 `node_modules` 一起拷进来（具体命令见该目录 README.md）。
+- **定义表与入库载荷必须对齐，重新拷载荷后要一起改定义表**。这里有两个独立的门：
+  - `requiredSeedPaths`：seed 前逐项检查（`findMissingOfficialPluginSeedPaths`），缺任一项就以 `ZCODE_PLUGIN_SEED_INCOMPLETE` **跳过整个插件**并回退旧缓存。这是最容易踩的——路径存在与否只看载荷，写错了插件就静默装不上。
+  - `version`：决定插件缓存目录名 `cache/<marketplace>/<name>/<version>`，也被 SEA 清单按名精确匹配（`item.version === definition.version`）。拷了新版本载荷却不改 version，缓存目录名会与实际内容不符，旧版本 fallback 判定也跟着错。
+  - 合并上游后从新版官方 app 重新拷载荷时，要同步更新定义表的 `version` 与 `requiredSeedPaths`（当前 zcode-guide 已是本地对齐后的值）。
+- 从官方 app 拷载荷时**只覆盖定义表里那 12 个目录**，不要把 `browser-use-plugin`、`node-repl-host`、`bundled-skills` 或插件内的 `node_modules` 一起拷进来（具体命令见该目录 README.md）。
 - 这些是官方预编译资产，自用可以，**对外分发存在许可风险**。
 
-#### 实测结果（2026-09-28，官方 app 3.14.3 + fork 1.1.0）
+#### 实测结果
+
+**2026-09-28（官方 app 3.14.3 + fork 1.1.0，定义表尚未对齐）：**
 
 以官方 `ZCode.app` 的 `glm/packages` 为来源实测（探针：把暂存结果当打包后的
 `Resources/glm` 用，以该项目录为 cwd 调真实的 `resolveOfficialPluginRoots`）：
@@ -295,11 +303,21 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 `bundled-skills` 无 manifest 被忽略。官方那 16 个里多出的 `document-skills`、`zcode-cua`
 是历史版本留下的旧目录（`document-skills` 已拆分为 documents/pdf/presentations/spreadsheets）。
 
-**唯一缺的插件是 `zcode-guide`**：官方载荷是 `0.3.0`（技能重组为 `skills/zcode-configuration-guide`、
-`skills/diagnosing-*`，`dynamic-workflows` 移到了 `bundled-skills`），而本仓库定义表仍按 `0.2.0`
-要求 `commands/workflow.md` 与 `skills/dynamic-workflows/*`。seed 会按设计降级：跳过该插件、
-写 `ZCODE_PLUGIN_SEED_INCOMPLETE` 告警并列出缺失文件，不影响其它插件。要对齐需同时改定义表的
-`version` 与 `requiredSeedPaths`（上游文件，合并时注意保护）。
+那次唯一缺的是 `zcode-guide`，原因是定义表按 `0.2.0` 钉 `commands/workflow.md` 与
+`skills/dynamic-workflows/*`，而入库载荷是 `0.3.0`（技能已重组为 `skills/zcode-configuration-guide`、
+`skills/diagnosing-*`，`dynamic-workflows` 移到了 `bundled-skills`），四个路径全部缺失，
+于是 seed 按设计降级、只影响该插件。
+
+**2026-09-30（定义表已对齐）：** 同一探针，源码构建的两个插件也一起 stage 后实测：
+
+```
+vendor 载荷暂存：12 个（跳过 browser-use-plugin, node-repl-host）
+最终落进缓存的插件：14 个
+ZCODE_PLUGIN_SEED_INCOMPLETE 告警：0 条
+  zcode-guide 缓存版本目录：0.3.0
+```
+
+即 14 条内置定义**全部**落盘，不再有被跳过的插件。
 
 ## 三、踩坑记录（不要再重复）
 
@@ -389,19 +407,19 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 
 ## 五、合并冲突决策表
 
-| 冲突场景                                                                                   | 处理方式                                                                                                                        |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| 上游改动第二节所列文件的**非路径行**                                                       | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                  |
-| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`）          | 采用上游后手动改为 `.zcodex`                                                                                                    |
-| 上游新增/修改 **user vs workspace** 目录 segments                                          | 对照 2.2 的作用域拆分点，仅 user 级改 `.zcodex`                                                                                 |
-| 上游改 productName / 应用名相关                                                            | 保留本地 `ZCodex` 命名                                                                                                          |
-| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑                                | 直接采用上游                                                                                                                    |
-| 上游改品牌文案（i18n、提示词、菜单）                                                       | 直接采用上游                                                                                                                    |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                             | 直接采用上游（本地未定制，无冲突基础）                                                                                          |
-| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项） | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项 |
-| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                    |
-| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）               | 对照 2.6；定义表若与入库载荷版本不一致，改定义表而不是改载荷                                                                    |
-| 上游新增数据目录子目录（v2 下新文件等）                                                    | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                   |
+| 冲突场景                                                                                   | 处理方式                                                                                                                                               |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 上游改动第二节所列文件的**非路径行**                                                       | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                         |
+| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`）          | 采用上游后手动改为 `.zcodex`                                                                                                                           |
+| 上游新增/修改 **user vs workspace** 目录 segments                                          | 对照 2.2 的作用域拆分点，仅 user 级改 `.zcodex`                                                                                                        |
+| 上游改 productName / 应用名相关                                                            | 保留本地 `ZCodex` 命名                                                                                                                                 |
+| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑                                | 直接采用上游                                                                                                                                           |
+| 上游改品牌文案（i18n、提示词、菜单）                                                       | 直接采用上游                                                                                                                                           |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                             | 直接采用上游（本地未定制，无冲突基础）                                                                                                                 |
+| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项） | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                        |
+| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                           |
+| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）               | 对照 2.6。定义表与入库载荷不一致时改定义表、不改载荷；**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**，其余条目可直接采用上游 |
+| 上游新增数据目录子目录（v2 下新文件等）                                                    | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                          |
 
 ## 六、合并后自查命令
 
@@ -431,6 +449,19 @@ comm -12 \
 pnpm typecheck && pnpm lint && pnpm architecture:check --changed
 # 改动过 main / preload / renderer 时额外跑（既有缺口基线 86 个错误，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
+```
+
+**CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
+但本机 `apps/zcode-cli/node_modules` 只装了 tsc/oxlint/oxfmt、没有 turbo，这条命令会以
+`sh: turbo: command not found` 失败（环境问题，不是代码问题）。改到 CLI 代码时直接跑包内脚本：
+
+```bash
+# 以改动所在的包为例（bootstrap）
+cd apps/zcode-cli/packages/bootstrap
+../../node_modules/.bin/tsc --noEmit      # 应通过
+../../node_modules/.bin/oxlint src        # 既有基线：20 errors / 22 warnings
+#   20 个 error 全是上游文件的 eslint(max-lines)，见 v4-gateway / bundled-plugins 等；
+#   判定标准同 ③：只要报错文件不是自己改的就没引入回归。
 ```
 
 ## 七、历史合并记录（追加式）
