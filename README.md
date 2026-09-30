@@ -156,25 +156,18 @@ pnpm bundle:desktop -- --help
 sudo xattr -rd com.apple.quarantine /Applications/ZCode.app
 ```
 
-#### 可选：随包带上官方的内置插件载荷
+#### 内置插件载荷
 
-官方安装包的 `Contents/Resources/glm/packages/` 里有 14 个内置插件包，本仓库只包含其中
+官方安装包的 `Contents/Resources/glm/packages/` 里有 14 个内置插件包。本仓库带其中
 `browser-use-plugin`、`node-repl-host`（以及技能包 `bundled-skills`）的源码；其余 12 个
 （pdf、documents、spreadsheets、presentations、image-search、android-emulator、ios-simulator、
 plugin-creator、skill-creator、restore-legacy-sessions、zcode-guide、zcode-cua）是官方预编译资产，
-没有源码，因此源码构建的产物里既不会安装它们，插件市场也搜不到。
+已作为载荷入库在 `packages/desktop/vendor/official-plugins/`。暂存与打包时会自动带上，
+因此在任意平台（含 Windows）干净检出后打包都会包含这批插件。
 
-想让自己构建的产物也带这批插件，把载荷放进 `packages/desktop/vendor/official-plugins/`
-（该目录已被 `.gitignore` 忽略，不会入库），暂存与打包时会自动带上：
-
-```bash
-mkdir -p packages/desktop/vendor/official-plugins
-cp -R /Applications/ZCode.app/Contents/Resources/glm/packages/. \
-      packages/desktop/vendor/official-plugins/
-```
-
-细节、来源优先级与许可说明见 [packages/desktop/vendor/official-plugins/README.md](packages/desktop/vendor/official-plugins/README.md)。
-这些包是官方预编译二进制，自己本机使用没问题，对外分发需自行确认许可。
+这批载荷是官方预编译二进制，**不是开源代码**：自己本机使用没问题，对外分发需自行确认许可。
+入库范围、升级上游后如何重新对齐载荷、来源优先级与已知版本差异见
+[packages/desktop/vendor/official-plugins/README.md](packages/desktop/vendor/official-plugins/README.md)。
 
 载荷版本要与源码里的内置插件定义表一致；不一致的插件会被跳过（日志里带缺失文件清单），
 其余插件不受影响。

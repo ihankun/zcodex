@@ -3,6 +3,10 @@
 # 不应跨目录改写其文件，否则两边格式化器会互相打架。
 apps/zcode-cli/
 
+# 官方内置插件预编译载荷（已入库）。第三方产物，不该由本仓格式化器改写：
+# 重新从官方 app 拷一份就会产生整目录 diff，且会改变 seed 的文件清单 hash。
+packages/desktop/vendor/official-plugins/
+
 # 这两个 fixture 是 dynamic-workflow 子包的图测试输入，刻意使用 for await 的非法 TS 语法，
 # oxfmt 解析会报错；只排除这两个文件，其余 graphs fixture 仍参与格式检查。
 apps/zcode-cli/packages/dynamic-workflow/tests/graphs/control-flow-for-await.ts

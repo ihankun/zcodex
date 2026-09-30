@@ -12,10 +12,27 @@ packages/desktop/bundled-resources/
 packages/desktop/bundled-agents/
 packages/desktop/bundled-tools/
 packages/desktop/mock-cdn/
-# 本地补齐的内置插件载荷：从官方 app 拷出的预编译资产，可能是第三方二进制，
-# 不应入库。目录内只保留 README.md（补齐方法见该文件）。
-packages/desktop/vendor/official-plugins/*
-!packages/desktop/vendor/official-plugins/README.md
+# 内置插件载荷（packages/desktop/vendor/official-plugins/）：
+# 官方桌面包自带、开源仓库没有源码的那批预编译插件已入库，这样在任意平台（含 Windows）
+# 干净检出后打包都能带上它们，不必各机器手工拷一份。入库范围与忽略规则见该目录 README.md。
+#
+# 下面这些**不入库**：
+# - browser-use-plugin / node-repl-host：仓库 apps/zcode-cli/packages/ 下有源码，
+#   stage-agent-bundle.mjs 按「仓库源码 > vendor」优先级跳过 vendor 副本，
+#   入库只会让同一插件出现两份载荷。本地若从官方 app 拷过，留在这里被忽略即可。
+# - bundled-skills：不是插件（没有 .zcode-plugin/plugin.json），由源码单独 stage。
+# - 各插件内的 node_modules：平台专有原生二进制（如 darwin 的 sharp/koffi），
+#   提交后在其他平台无法加载，且会让 dev 与打包产物的 seed hash 分叉。
+packages/desktop/vendor/official-plugins/browser-use-plugin/
+packages/desktop/vendor/official-plugins/node-repl-host/
+packages/desktop/vendor/official-plugins/bundled-skills/
+packages/desktop/vendor/official-plugins/*/node_modules/
+# android-emulator / ios-simulator 的 dist/ 是**运行必需**产物：它们的 .mcp.json 与
+# plugin.json 都指向 ${*_PLUGIN_ROOT}/dist/mcp/server.js，缺了整个插件起不来。
+# 顶层 `dist/`（构建产物）会连目录一起排除，git 不会进入被排除的目录，
+# 所以这里必须先 re-include 目录本身，只写 dist/** 不够。
+!packages/desktop/vendor/official-plugins/*/dist/
+!packages/desktop/vendor/official-plugins/*/dist/**
 *.tsbuildinfo
 .DS_Store
 coverage/

@@ -243,7 +243,7 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 
 - **fork 版本号与上游解耦**：根 `package.json` 的 `version` 就是应用版本（`build-metadata.mjs` 的 `appVersion` → electron-builder `extraMetadata.version`），因此合并上游后要顺带按 semver 决定 fork 版本：合入上游**功能版**升 minor（本次 1.0.0 → 1.1.0），只合修复升 patch，不要跟随上游的 `3.14.x` 数字。
 
-## 九、内置插件载荷本地补齐（2026-09-28 新增，可选）
+## 九、内置插件载荷入库（2026-09-28 新增，2026-09-30 改为入库）
 
 ### 1. 为什么需要
 
@@ -255,16 +255,38 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 插件市场里搜不到它们。
 
 **先排除误判**：这跟 fork 版本号（1.1.0 vs 上游 3.14.x）无关，两边 `cdn-marketplace.json` 条目数相同（26）。
-判定链是「内置定义表（已在开源仓库） + 载荷（不在） → 启动 seed → 内置市场分片」。
+判定链是「内置定义表（已在开源仓库） + 载荷（原先缺，现已入库） → 启动 seed → 内置市场分片」。
+
+**这 12 个载荷已入库**（原先只在本地、被 `.gitignore` 忽略）。原因：载荷只在某一台机器上存在时，
+在另一平台（尤其 Windows）干净检出后打包就又没有插件，必须能随仓库一起走。
+入库后任意平台打包都会带上，不再需要各机器手工从官方 app 拷一份。
+
+### 1.1 入库范围（本次关键决策）
+
+`packages/desktop/vendor/official-plugins/` 的 61MB 里只有约 2.2MB 真正会被打包，
+其余是**永远用不到的死载荷**，故不入库（`.gitignore` 逐条排除）：
+
+| 排除项 | 体积 | 原因 |
+| --- | --- | --- |
+| `browser-use-plugin`、`node-repl-host` | 38M | 仓库 `apps/zcode-cli/packages/` 下有源码，`stageVendoredOfficialPlugins` 按「仓库源码 > vendor」跳过 vendor 副本；入库只会让同一插件出现两份载荷 |
+| `bundled-skills` | 152K | 不是插件（无 `.zcode-plugin/plugin.json`），由源码单独 stage |
+| `*/node_modules` | 18M | 平台专有原生二进制（`zcode-cua-plugin` 下的 darwin `libvips`/`koffi`/`sharp`），其他平台加载不了；且入库载荷不含它、本地含它会让同一插件算出两份 seed hash |
+
+`zcode-cua-plugin` 的 `node_modules` 尤其没有价值：它只含 sharp/koffi 等，连它 `package.json`
+声明的 `@zcode/zcode-cua` 都没有，而该包在本仓库是 fail-closed 占位
+（`packages/zcode-cua/package.json`：*ships without Computer Use*）；其 client script
+（`scripts/computer-use-client.mjs`）只 import Node 内置模块，不引用任何原生依赖。
 
 ### 2. 改动清单（合并冲突时保护本地版本）
 
 | 文件                                                       | 说明                                                                                                                                                                                  |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/desktop/scripts/stage-agent-bundle.mjs`          | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE` |
-| `packages/desktop/vendor/official-plugins/README.md`（新） | 补齐方法与来源优先级说明；**该目录下的载荷全部被 `.gitignore` 忽略，不入库**                                                                                                          |
-| `.gitignore`                                               | `packages/desktop/vendor/official-plugins/*` 加 `!README.md` 例外                                                                                                                     |
-| `README.md`                                                | 打包章节新增「可选：随包带上官方的内置插件载荷」                                                                                                                                      |
+| `packages/desktop/scripts/stage-agent-bundle.mjs`          | 新增 `stageVendoredOfficialPlugins()`，由 `stageAgentBundle()` 在清空 `glm` 之后调用；新增导出常量 `VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE` / `AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE`；新增 `excludedVendoredPluginAssetNames`（`.DS_Store` + `node_modules`）与 `shouldCopyVendoredPluginAsset` |
+| `packages/desktop/vendor/official-plugins/**`（新，12 个插件载荷入库） | 仓库没有源码的内置插件预编译资产，随仓库分发以保证任意平台打包都带插件                                                                                                     |
+| `packages/desktop/vendor/official-plugins/README.md`（新） | 入库范围、升级上游后重新对齐载荷的方法、来源优先级与许可说明                                                                                                                          |
+| `.gitignore`                                               | 逐条排除 `browser-use-plugin/`、`node-repl-host/`、`bundled-skills/`、`*/node_modules/`（见 1.1）；不再整目录忽略。**并保留 `!…/*/dist/` 与 `!…/*/dist/**` 两条 re-include**：顶层 `dist/` 会连目录排除，而 android-emulator / ios-simulator 的 `dist/mcp/server.js` 是运行必需产物 |
+| `.oxlintrc.json`、`.prettierignore`、`knip.json`              | 把 `packages/desktop/vendor/official-plugins` 排除出 lint/fmt/未使用检查：第三方产物不该被格式化或当作项目源码分析，否则每次重新拷载荷都产生无意义 diff |
+| `README.md`                                                | 打包章节的「可选：随包带上官方的内置插件载荷」改为「内置插件载荷」，说明已入库                                                                                                        |
 
 ### 3. 必须遵守的约束
 
@@ -275,12 +297,22 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
   同一目录会变成两份载荷的并集，seed 的 hash 随机器变化，dev 与打包产物行为不一致。
 - **只认带 `.zcode-plugin/plugin.json` 的目录**，与官方 seed 的候选根判定
   （`bootstrap/bundled-plugins.ts` 的 `resolveFilesystemPluginRoot`）保持一致；`bundled-skills` 因此被自动忽略。
-- vendor 目录缺省时必须静默跳过：公开检出与 CI 没有这个目录，构建不能因此失败。
+- **`node_modules` 一律不进 vendor 载荷，也不进 bundle**：它在 `.gitignore` 里，语义是「随机器变化的本地产物」。
+  入库载荷不含它，本地若含它就会算出两份 seed hash —— 这正是来源优先级要避免的同一类不一致。
+  暂存时由 `shouldCopyVendoredPluginAsset` 过滤，不能只靠 `.gitignore`（vendor 是读工作树，不是读索引）。
+- **插件自带的 `dist/` 必须入库**：`.gitignore` 顶层的 `dist/`（构建产物）会连目录一起排除，
+  而 android-emulator / ios-simulator 的 MCP 服务就是 `dist/mcp/server.js`（`.mcp.json` 与
+  `plugin.json` 都指向它）。git 不进入被排除的目录，所以必须 re-include 目录本身，
+  只写 `dist/**` 无效。改动 `.gitignore` 或重新拷载荷后用 1.1 节末尾的 `git ls-files --others --ignored`
+  校验一次，别只在打包日志里看到「staged 12 个」就认为完整 —— 目录少文件时它照样报 12 个。
+- vendor 目录缺省时必须静默跳过：载荷虽已入库，但缺目录时构建不能因此失败。
 
 ### 4. 注意
 
 - 载荷要与源码里的内置定义表版本对得上（`apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts`）。
   合并上游后应从新版官方 app 重新拷一份，否则 `requiredSeedPaths` 缺失会告警并跳过该插件（只影响单个插件）。
+  **只覆盖 1.1 表里那 12 个目录**，不要把 `browser-use-plugin`、`node-repl-host`、`bundled-skills`
+  或插件内的 `node_modules` 一起拷进来（具体命令见该目录 README.md）。
 - 这些是官方预编译资产，自用可以，**对外分发存在许可风险**。
 
 ### 5. 实测结果（2026-09-28，官方 app 3.14.3 + fork 1.1.0）

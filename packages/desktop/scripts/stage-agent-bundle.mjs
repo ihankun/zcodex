@@ -29,8 +29,9 @@ export const AGENT_BUNDLE_SOURCE_RELATIVE = "apps/zcode-cli/packages/cli/dist/zc
 // 见 stageVendoredOfficialPlugins 的来源优先级说明。
 export const AGENT_PLUGIN_SOURCE_PACKAGES_RELATIVE = "apps/zcode-cli/packages";
 
-// 本地补齐的内置插件载荷目录（gitignore，见同目录 README.md）。
-// 官方桌面包里有 12 个内置插件包在开源仓库没有源码，靠它才能随本地构建一起打包。
+// 内置插件载荷目录（已入库，见同目录 README.md）。
+// 官方桌面包里有 12 个内置插件包在开源仓库没有源码，入库后任意平台（含 Windows）
+// 干净检出即可打包，不必各机器手工从官方 app 拷一份。
 export const VENDORED_OFFICIAL_PLUGIN_ROOT_RELATIVE = "packages/desktop/vendor/official-plugins";
 
 export function resolveAgentBundlePaths({ repoRoot, platformKey }) {
@@ -44,14 +45,15 @@ export function resolveAgentBundlePaths({ repoRoot, platformKey }) {
 }
 
 /**
- * 把 vendor 目录里的内置插件载荷补进 glm/packages（本地自用，见
+ * 把 vendor 目录里的内置插件载荷补进 glm/packages（见
  * packages/desktop/vendor/official-plugins/README.md）。
  *
  * 必须在这里做，不能靠手工往 bundled-agents/<平台>/glm/packages/ 里放：stageAgentBundle
  * 每次都会 rmSync 重建 glm 目录，dev 链（scripts/build-desktop-agent-cli.mjs）和打包链
  * （prepare-agent-node-bundle.mjs）都会调，手工放进去的载荷会被下一次构建清掉。
  *
- * 目录缺省时静默跳过：这是可选的本地补齐，公开检出没有这个目录也必须能正常构建。
+ * 目录缺省时静默跳过：载荷已入库，正常检出一定有；但缺目录也必须能构建，
+ * 所以保持静默跳过而不是报错。
  * 只认带 .zcode-plugin/plugin.json 的目录 —— 官方 seed 也按这个文件判定候选根目录
  * （bootstrap/official-plugin-definitions.ts 的 rootCandidates + bundled-plugins.ts
  * 的 resolveFilesystemPluginRoot），缺它的目录既不会被 seed 也不可能在市场里出现。
@@ -84,8 +86,7 @@ export function stageVendoredOfficialPlugins({ repoRoot, glmDir, log = console.l
     }
     cpSync(sourceRoot, resolve(glmDir, "packages", entry.name), {
       recursive: true,
-      // 从官方安装包里拷出来的载荷会带 .DS_Store，它只影响 seed 的文件清单 hash。
-      filter: (sourcePath) => basename(sourcePath) !== ".DS_Store",
+      filter: shouldCopyVendoredPluginAsset,
     });
     // 带上载荷自报版本：本地定义表（official-plugin-definitions.ts）滞后于官方载荷时，
     // 这里能直接看出来，不用等到用户反馈「插件装上了但功能对不上」。
@@ -101,6 +102,18 @@ export function stageVendoredOfficialPlugins({ repoRoot, glmDir, log = console.l
     );
   }
   return result;
+}
+
+// vendor 载荷里刻意不进 bundle 的两类文件：
+// - `.DS_Store`：从官方安装包拷出来时带的 macOS 目录元数据，只污染 seed 的文件清单 hash。
+// - `node_modules`：平台专有原生二进制（如 zcode-cua-plugin 下的 darwin sharp/koffi）。
+//   它已被 .gitignore 排除，语义就是「随机器变化的本地产物」。入库的载荷不含它，
+//   本地若含它就会算出两份不同的 seed hash，出现来源优先级那段注释要避免的
+//   「dev 与打包产物取到的载荷不同」。
+const excludedVendoredPluginAssetNames = new Set([".DS_Store", "node_modules"]);
+
+function shouldCopyVendoredPluginAsset(sourcePath) {
+  return !excludedVendoredPluginAssetNames.has(basename(sourcePath));
 }
 
 function readPluginManifestVersion(manifestPath) {
