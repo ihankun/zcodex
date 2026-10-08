@@ -49,7 +49,9 @@ export function formatZCodeHostProcessName(label?: string): string {
 
 export function formatZCodeRendererProcessName(windowTitle?: string): string {
   const normalizedTitle = windowTitle?.trim();
-  if (!normalizedTitle || normalizedTitle === "ZCode") {
+  // 主窗口的标题来自 renderer/index.html 的 `<title>`，本地定制改成 ZCodex 后这里要跟着改，
+  // 否则默认标题不再命中，进程名会从 `zcode-renderer-main` 退化成 `zcode-renderer-zcodex`。
+  if (!normalizedTitle || normalizedTitle === "ZCodex") {
     return joinZCodeProcessName("renderer", "main");
   }
 
