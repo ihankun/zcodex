@@ -81,7 +81,7 @@ const OFFICIAL_CUA_REQUIRED_SEED_PATHS = [
 // 没有 /workflow 命令的插件——症状是命令不存在，没有任何诊断。技能正文都钉住。
 //
 // 0.3.0 起载荷重组（本地定制：本仓库入库的是官方 3.14.3 带的 0.3.0 载荷，见
-// .zcodex/upstream-merge-notes.md 2.6）：/workflow 命令与 dynamic-workflows 技能已移到
+// docs/upstream-merge-notes.md 2.6）：/workflow 命令与 dynamic-workflows 技能已移到
 // bundled-skills（由 prepare-agent-node-bundle.mjs 的 bundledSkillPack 单独校验），
 // 本插件的内容就是下面 6 篇技能正文。原先按 0.2.0 钉的 commands/workflow.md 与
 // skills/dynamic-workflows/* 在 0.3.0 载荷里根本不存在，会让 seed 以

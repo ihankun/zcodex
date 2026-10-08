@@ -21,7 +21,7 @@ export async function resolveUserSubagentRoot(options?: SubagentStorageOptions):
 }
 
 export function resolveWorkspaceSubagentRoot(workspacePath: string): string {
-  return join(workspacePath, ".zcode", "agents");
+  return join(workspacePath, ".zcodex", "agents");
 }
 
 export async function resolveSubagentStateFile(options?: SubagentStorageOptions): Promise<string> {

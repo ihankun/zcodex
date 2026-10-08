@@ -71,10 +71,10 @@ interface SkillsServiceOptions {
 
 /** ZCode Agent 工作区级技能目录。 */
 function getWorkspaceZcodeSkillRoot(workspacePath: string): string {
-  return join(workspacePath, ".zcode", "skills");
+  return join(workspacePath, ".zcodex", "skills");
 }
 
-/** 兼容目录: workspace 级 `.agents/skills`, 仅在同层 `.zcode/skills` 没读到技能时 fallback。 */
+/** 兼容目录: workspace 级 `.agents/skills`, 仅在同层 `.zcodex/skills` 没读到技能时 fallback。 */
 function getWorkspaceAgentsSkillRoot(workspacePath: string): string {
   return join(workspacePath, ".agents", "skills");
 }
@@ -133,7 +133,7 @@ async function isUserAgentsSkillCoveredByZcode(params: {
 
 /**
  * 从 workspacePath 向上走到 worktree 根（含 .git 标记），把每一层的
- * `.zcode/skills` 与 `.agents/skills` 都收集起来。
+ * `.zcodex/skills` 与 `.agents/skills` 都收集起来。
  * 对齐 apps/zcode-cli/packages/adapters/src/skills/roots.ts:60-72。
  * 找不到 .git 时退回 workspacePath 自身。
  */
@@ -155,7 +155,7 @@ async function resolveAncestorWorkspaceRoots(workspacePath: string): Promise<str
   const roots: string[] = [];
   for (const dir of baseDirectories) {
     // Agent runtime 会合并扫描两个 workspace skill 根。UI 之前把 `.agents`
-    // 当成 `.zcode` 的 fallback，导致同层 `.zcode` 只要有一个技能，`/`、`$` 和设置页
+    // 当成 `.zcodex` 的 fallback，导致同层 `.zcodex` 只要有一个技能，`/`、`$` 和设置页
     // 就会整根漏掉 `.agents` 技能，形成“模型可执行但 UI 无法引用”的发现语义分裂。
     roots.push(getWorkspaceZcodeSkillRoot(dir));
     roots.push(getWorkspaceAgentsSkillRoot(dir));
@@ -851,7 +851,7 @@ async function discoverSkills(params: {
     rootPath,
   }));
   if (params.includeUserSkills) {
-    // 用户级技能是全局资源，`.zcode/skills` 里只要存在一个技能就截断
+    // 用户级技能是全局资源，`.zcodex/skills` 里只要存在一个技能就截断
     // `.agents/skills` 会导致外部 Agent 的全局技能在导入后从设置页消失。
     roots.push({
       scope: "user" as const,
@@ -1206,7 +1206,7 @@ export function createSkillsService(options?: SkillsServiceOptions): ISkillsServ
       }
 
       // 安全护栏：删除是 `rm -rf` 目录的破坏性操作，仅允许命中受控技能根。
-      // 收集工作区各层级（沿 worktree 向上）的 .zcode/skills 与 .agents/skills，外加用户级两根。
+      // 收集工作区各层级（沿 worktree 向上）的 .zcodex/skills 与 .agents/skills，外加用户级两根。
       const allowedRootCandidates = await resolveAncestorWorkspaceRoots(params.workspacePath);
       allowedRootCandidates.push(getUserZcodeSkillRoot());
       allowedRootCandidates.push(getUserAgentsSkillRoot());

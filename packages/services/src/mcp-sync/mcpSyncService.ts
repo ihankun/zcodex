@@ -44,7 +44,7 @@ const ZCODE_MCP_DESCRIPTOR: DirectoryMcpDescriptor = {
   source: "zcode",
   directorySource: "zcode",
   userConfigDirSegments: [".zcodex", "cli"],
-  workspaceConfigDirSegments: [".zcode"],
+  workspaceConfigDirSegments: [".zcodex"],
   fileName: "config.json",
   configKeyName: "mcp.servers",
 };

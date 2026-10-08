@@ -4,31 +4,33 @@
 > 上游基线：ZCode v3.14.3 = `29628c9`（= `origin/main`）。fork 版本号独立演进，当前 `1.1.2`。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
 > `git diff 29628c9 dev -- . ':(exclude)packages/desktop/vendor'` 即全部本地改动；
-> 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（home 目录改名）与真正的行为改动分开
+> 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-09-30。
+> 最近复核：2026-10-08。
 
 ## 一、概览
 
-| 定制                                                    | 影响面                                      | 详见 |
-| ------------------------------------------------------- | ------------------------------------------- | ---- |
-| 打包应用名 `ZCode` → `ZCodex`                           | 7 个文件                                    | 2.1  |
-| home 数据目录 `~/.zcode/` → `~/.zcodex/`                | 99 个文件（纯字样改动）                     | 2.2  |
-| UI 定制：Logo / 布局 / 模型设置 / 供应商入口            | `packages/ui`                               | 2.3  |
-| 启动与桌面行为：force-gate、Dock 图标、DMG 底图         | `packages/desktop/src/main`、`build/`       | 2.4  |
-| 桌面自动更新改走 GitHub Release，未签名构建回退手动安装 | desktop + shared + client + ui + web + 构建 | 2.5  |
-| 内置插件载荷入库                                        | 构建流程与产物                              | 2.6  |
+| 定制                                                      | 影响面                                      | 详见 |
+| --------------------------------------------------------- | ------------------------------------------- | ---- |
+| 打包应用名 `ZCode` → `ZCodex`                             | 7 个文件                                    | 2.1  |
+| 数据目录统一改名 `.zcode` → `.zcodex`（home 级 + 项目级） | 99 个文件（home 字样）+ 约 40 处（项目级）  | 2.2  |
+| UI 定制：Logo / 布局 / 模型设置 / 供应商入口              | `packages/ui`                               | 2.3  |
+| 启动与桌面行为：force-gate、Dock 图标、DMG 底图           | `packages/desktop/src/main`、`build/`       | 2.4  |
+| 桌面自动更新改走 GitHub Release，未签名构建回退手动安装   | desktop + shared + client + ui + web + 构建 | 2.5  |
+| 内置插件载荷入库                                          | 构建流程与产物                              | 2.6  |
 
 **改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面四处**改了内部行为**，合并时最容易出事：
 
 - 启动强制升级 gate 已禁用（2.4.1）
 - 桌面自动更新不再读服务端 manifest，改读 GitHub Release（2.5）
-- home 数据目录改名，且 user 级与项目级作用域要分开处理（2.2）
+- 数据目录改名：**home 级与项目级现已统一为 `.zcodex`**，不再区分 user/项目作用域（2.2）
 - 内置插件的 seed 结果随定义表变化：入库载荷 + 对齐后的 `official-plugin-definitions.ts`（2.6）
 
-**明确未改的内部标识符**：npm 包名、`ZCODE_*` 环境变量名、CLI 命令名、IPC 通道名、协议常量、深链 scheme、项目内 `<项目>/.zcode/` 目录。清单见第四节。
+**明确未改的内部标识符**：npm 包名、`ZCODE_*` 环境变量名、CLI 命令名、IPC 通道名、协议常量、深链 scheme、
+以及 `.zcodeignore`、`.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 这类隐藏文件名。清单见第四节。
 
-历史数据不做迁移；项目内 `.zcode/` 与上游保持互认。
+**数据迁移不做**：改名不回读旧目录。已有的 home 数据与项目目录需要用户自行把 `.zcode/` 改名成 `.zcodex/`，
+否则不会被读取（2026-10-08 起项目级与 home 级同此口径）。
 
 ## 二、本地定制清单（合并冲突时保护本地版本）
 
@@ -50,10 +52,16 @@
 `packages/desktop/src/main/mcpUserDirectory/legacy.ts` 里的 `join(appData, "ZCode", …)`
 是**有意保留**的（作者字段、旧版 appData 迁移路径），别当成漏改。
 
-### 2.2 home 数据目录（99 个文件，关键字面量 `.zcode` → `.zcodex`）
+### 2.2 数据目录：`.zcode` → `.zcodex`（home 级与项目级统一，2026-10-08 起）
+
+本 fork 把**所有**数据/配置目录统一为 `.zcodex`，**不再区分 user 级与项目级作用域**：
+
+- **home 级**：`{dataBaseDir}/.zcodex`（`getZCodeDataRootDir()`）、CLI 的 `~/.zcodex/cli/...`。99 个文件，纯字样改动。
+- **项目级**：`<项目>/.zcodex/`。2026-10-08 之前曾是 `.zcode`（与上游 CLI 互认），现已统一；
+  改动点见本节末尾「项目级（2026-10-08 新增）」。
 
 只涉及该字样、没有其他改动的文件实测 100 个；下面按模块列出，但**列表不追求穷尽**，
-新增 home 级路径拼接时按同样规则处理即可。
+新增路径拼接时按同样规则处理即可。
 
 **中心枢纽（改动会被大面积继承，优先看）：**
 
@@ -68,13 +76,56 @@
 
 **CLI（apps/zcode-cli）**：`contracts/src/config/index.ts`（`DefaultRuntimeConfig.storage`）、`cli/clipboard-image.ts`、`sea-runtime-tools.ts`、`provider-runtime-env.ts`、`adapters/` 下 context/config/auth/trust-store/session-store/workflow/runner-debug/execution-utils/device-mid/logging、`telemetry/bootstrap.ts`、`debug/server/sources.ts`、`bootstrap/` 下 script-workflow-tool-port、script-workflow-utils、create-app（mailbox）、`contracts/src/tools/saved-workflow.ts` 的 `SAVED_WORKFLOW_GLOBAL_DIR`
 
-**作用域拆分点（最容易合并错，重点核对）**：
+**项目级（2026-10-08 新增，`<项目>/.zcodex/`）：**
 
-- `apps/zcode-cli/packages/adapters/src/commands/roots.ts` 与 `skills/roots.ts` — 原 user/project 共用 `ZCODE_DIR = ".zcode"`，现拆为：user 级 `USER_ZCODE_DIR = ".zcodex"`，project 级保持 `.zcode`
-- `packages/services/src/hooks/hooksService.ts` — 同一表达式内 workspace 分支 `.zcode` 不变、home 分支 `.zcodex/cli`
-- `packages/services/src/settings-sync/settingsSyncService.ts`、`skillsService.ts`、`commandsService.ts`、`mcpSyncService.ts`、`mcpUserDirectory/index.ts` — `user*Segments` 用 `.zcodex`，`workspace*Segments` 用 `.zcode`
-- `apps/zcode-cli/packages/contracts/src/tools/saved-workflow.ts` — `SAVED_WORKFLOW_GLOBAL_DIR = ".zcodex/workflows"`（home），`SAVED_WORKFLOW_PROJECT_DIR` 保持 `.zcode/workflows`
-- `packages/ui/src/lib/skillSourceFilter.ts` — 路径来源检测同时匹配 `/.zcodex/...`（新用户级）与 `/.zcode/...`（项目级），**勿删任一分支**
+作用是让全仓只剩一个目录名，合并上游时冲突退化成纯字面量替换。改动点：
+
+| 文件                                                                                                                                                                                                                                                         | 项目级用途                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `apps/zcode-cli/packages/adapters/src/skills/roots.ts`、`commands/roots.ts`                                                                                                                                                                                  | 原 `ZCODE_DIR = ".zcode"` 与 `USER_ZCODE_DIR = ".zcodex"` **合并为一个** `".zcodex"`；`scope === "user" ? … : …` 三元分支删除 |
+| `apps/zcode-cli/packages/adapters/src/config/project-config.adapter.ts`                                                                                                                                                                                      | `basename(configDirectory) === ".zcode"` 判定                                                                                 |
+| `packages/services/src/skills/skillsService.ts`                                                                                                                                                                                                              | workspace skills 根                                                                                                           |
+| `packages/services/src/commands/commandsService.ts`                                                                                                                                                                                                          | `workspaceDirectorySegments`                                                                                                  |
+| `packages/services/src/subagents/subagentStorage.ts`                                                                                                                                                                                                         | workspace agents 根                                                                                                           |
+| `packages/services/src/mcp-sync/mcpSyncService.ts`                                                                                                                                                                                                           | `workspaceConfigDirSegments`                                                                                                  |
+| `packages/services/src/settings-sync/settingsSyncService.ts`                                                                                                                                                                                                 | `workspace*Segments`（skills / commands / plugins / config.json）                                                             |
+| `packages/services/src/hooks/hooksService.ts`                                                                                                                                                                                                                | workspace 分支与 `editable` 判定（home 分支仍是 `.zcodex/cli`，现在两分支同字面量）                                           |
+| `packages/desktop/src/main/mcpUserDirectory/index.ts`                                                                                                                                                                                                        | `workspaceConfigDirSegments`                                                                                                  |
+| `packages/shared/src/workspace-hook-config.ts`、`workspace-hook-mutation.ts`                                                                                                                                                                                 | 候选路径、`baseDir` 推断、`WorkspaceHookConfigFileKind` 的 `".zcode/config.json"` 字面量                                      |
+| `apps/zcode-cli/packages/contracts/src/hooks/workspace-hook-trust.ts`                                                                                                                                                                                        | 上述 kind 的 zod 枚举（信任记录持久化该值）                                                                                   |
+| `apps/zcode-cli/packages/contracts/src/tools/saved-workflow.ts`                                                                                                                                                                                              | `SAVED_WORKFLOW_PROJECT_DIR`、`WORKFLOW_DRAFTS_DIR`                                                                           |
+| `apps/zcode-cli/packages/bootstrap/src/subagents.ts`、`plugins.ts`、`app/script-workflow-*.ts`、`app/workspace-hook-review-mutation.ts`、`builtin-prompt-command.ts`                                                                                         | 项目 agents 目录、workspace plugin 配置、workflow 读写与 scope 判定、hook 评审写入路径、`/init` 提示词里的隐藏指令候选路径    |
+| `apps/zcode-cli/packages/core/src/subagent/persistent-memory.ts`、`memory/memory-file-path.ts`、`runtime/helpers/plan-file-continuity.ts`、`tool/handlers/workflow-drafts.ts`、`tool/handlers/saved-workflows/store.ts`、`permission/workflow-draft-path.ts` | agent-memory、memory 文件、plan 文件、workflow-drafts / workflows 落点                                                        |
+| `apps/zcode-cli/packages/dynamic-workflow-runtime/src/child-entry-file.ts`、`harness.ts`、`child-source.ts`                                                                                                                                                  | `workflow-runs` 入口文件落点                                                                                                  |
+| `packages/ui/src/lib/skillSourceFilter.ts`                                                                                                                                                                                                                   | 路径来源检测只需匹配 `/.zcodex/`（原 `.zcode` 分支删除，**注意同名的 `.agents` 分支保留**）                                   |
+| `packages/ui/src/settings/saved-workflows/useSavedWorkflowsDirectoryWatch.ts`                                                                                                                                                                                | `<ws>/.zcodex/workflows` 监听                                                                                                 |
+| `apps/zcode-cli/packages/bundled-skills/skills/dynamic-workflows/SKILL.md`                                                                                                                                                                                   | 技能正文里的路径说明（`.zcodex/workflow-drafts/`、`.zcodex/workflows/`）                                                      |
+| `packages/desktop/build/installer.nsh`                                                                                                                                                                                                                       | Windows 安装器「安装目录内含数据目录」阻断扫描                                                                                |
+| `apps/zcode-cli/packages/core/src/memory/memory-file-path.ts`                                                                                                                                                                                                | 记忆文件的敏感路径拒绝段 `.zcode` → `.zcodex`（配置目录不该被当作记忆落点）                                                   |
+| `apps/zcode-cli/packages/contracts/src/tools/workflow.ts`                                                                                                                                                                                                    | `Workflow` 工具 `name` 描述里的 `.zcodex/workflows/`                                                                          |
+| `apps/zcode-cli/packages/cli/src/dwf-child-command.ts`、`bootstrap/src/zcode-protocol/mcp.ts`、`packages/ui/src/lib/windowsFileLinkEscapeRemarkPlugin.ts` 等                                                                                                 | 仅注释/示例里的路径说明                                                                                                       |
+| `README.md`、`README.en.md`、`NOTICE.md`、`apps/zcode-cli/README.md`、`apps/zcode-cli/packages/debug/README.md`、`apps/zcode-cli/tools/prompt-trajectory/README.md`                                                                                          | 文档路径：含顺带修正的旧残留（见 2.2.1）                                                                                      |
+
+**不再有作用域拆分**：原先「user 级 `.zcodex` / 项目级 `.zcode`」的两套字面量与三元分支已全部消除。
+上游若重新引入 user/workspace 两条路径分支，两边都取 `.zcodex`，不要恢复 `.zcode`。
+
+#### 2.2.1 顺带修正的既有残留（2026-10-08 复核）
+
+改名时发现这些地方**本应在上一次 home 目录改名时就改掉**，属于漏改，一并修正：
+
+| 位置                                                                                                     | 原值               | 现值                | 影响                                                               |
+| -------------------------------------------------------------------------------------------------------- | ------------------ | ------------------- | ------------------------------------------------------------------ |
+| `packages/desktop/build/installer.nsh`                                                                   | 扫描 `.zcode`      | 扫描 `.zcodex`      | Windows 安装器的数据目录阻断实际扫的是旧名                         |
+| `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts`                                                      | 「`.zcode/v2`」    | 「`.zcodex/v2`」    | 设置页数据目录说明文案                                             |
+| `apps/zcode-cli/README.md`、`packages/debug/README.md`、`tools/prompt-trajectory/README.md`、`NOTICE.md` | `~/.zcode/cli/...` | `~/.zcodex/cli/...` | CLI 文档里的用户配置/数据库路径                                    |
+| `README.md`、`README.en.md`                                                                              | `~/.zcode/runtime` | `~/.zcodex/runtime` | 命令行版安装目录说明（`installer.mjs` 实际已是 `.zcodex/runtime`） |
+
+#### 2.2.2 刻意不改的 `.zcode` 字样
+
+- **vendor 载荷内的官方文档**：`packages/desktop/vendor/official-plugins/zcode-guide-plugin/skills/*/SKILL.md`
+  仍写 `.zcode/config.json`。这是官方预编译资产，改它会与官方载荷产生内容差异（2.6 的来源优先级 / seed hash
+  一致性要求载荷保持原样），因此**保留**。代价：这个内置插件的文档对本 fork 路径不再准确，属已知不准确处。
+- `SENSITIVE_MEMORY_PATH_SEGMENTS` 之外的其他 `.zcode` 命中均为内部标识符，见第四节。
 
 ### 2.3 UI 定制
 
@@ -387,50 +438,66 @@ ZCODE_PLUGIN_SEED_INCOMPLETE 告警：0 条
   `dark/light` 反而会让渲染进程的 `prefers-color-scheme` 被永久钉死、`change`
   事件不再派发。renderer 的 `useDesktopNativeThemeSync` → `SetTitleBarTheme` 是
   唯一的主题同步路径，链路正常时无需任何兜底。
+- **改了 `apps/zcode-cli/packages/contracts` 源码后要重建它的 `dist`，否则 `bootstrap` 的类型检查会报假错。**
+  `bootstrap`（以及 `server`/`zcode-server-cli` 的产物）解析 `@zcode/contracts` 走的是 `dist/*.d.ts`，
+  不是源码。2026-10-08 实测：改掉 `workspace-hook-trust.ts` 里的 `configFileKind` 字面量后，
+  `cd apps/zcode-cli/packages/bootstrap && ../../node_modules/.bin/tsc --noEmit` 报
+  `Type '".zcode/config.json"' is not assignable to type 'WorkspaceHookConfigFileKind'. Did you mean
+'".zcodex/config.json"'?` —— 源码里已经没有这个字面量，报的是 `contracts/dist` 里的旧声明。
+  先 `cd apps/zcode-cli/packages/contracts && ../../node_modules/.bin/tsc` 重建即可。
+  同理，`packages/*/dist`、`packages/desktop/bundled-agents/`、`apps/zcode-cli/packages/cli/dist/zcode.cjs`
+  都是产物：**改了路径字面量后必须重新构建，运行时才生效**（正在运行的 app 不会自动跟上）。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
-| 类别                | 说明                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------- |
-| npm 包名 `@zcode/*` | 全部 29 个包的 name、dependencies、import 均未动                                                  |
-| 环境变量 `ZCODE_*`  | 约 300 个 env 名未动（含 `ZCODE_DATA_BASE_DIR`、`ZCODE_HOME`）                                    |
-| CLI 命令名          | `bin: { zcode }`、`zcode.cjs`、`bin/zcode.mjs` 未动                                               |
-| IPC 通道名          | `zcode-task`、`zcode:select-file` 等 channels.ts 通道字符串未动（2.5 新增的两个通道除外）         |
-| 协议常量            | `ZCODE_PROTOCOL_NAME = "ZCode Protocol"`、`com.zcode/` MCP 命名空间、`Symbol.for("zcode.*")` 未动 |
-| 深链 scheme         | `zcode://`（OAuth 回调、share/import、workspace/open）未动                                        |
-| 项目内目录          | `<项目>/.zcode/`（config.json、skills、agents、commands、workflows）、`.zcodeignore` 未动         |
-| 品牌文案            | i18n（en-US/zh-CN）、菜单项、Agent 系统提示词（"You are ZCode, ..."）、TUI 文案未动               |
-| 隐藏文件            | `.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 等未动                                 |
+| 类别                | 说明                                                                                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| npm 包名 `@zcode/*` | 全部 29 个包的 name、dependencies、import 均未动                                                                                                    |
+| 环境变量 `ZCODE_*`  | 约 300 个 env 名未动（含 `ZCODE_DATA_BASE_DIR`、`ZCODE_HOME`）                                                                                      |
+| CLI 命令名          | `bin: { zcode }`、`zcode.cjs`、`bin/zcode.mjs` 未动                                                                                                 |
+| IPC 通道名          | `zcode-task`、`zcode:select-file` 等 channels.ts 通道字符串未动（2.5 新增的两个通道除外）                                                           |
+| 协议常量            | `ZCODE_PROTOCOL_NAME = "ZCode Protocol"`、`com.zcode/` MCP 命名空间、`Symbol.for("zcode.*")` 未动                                                   |
+| 深链 scheme         | `zcode://`（OAuth 回调、share/import、workspace/open）未动                                                                                          |
+| 品牌文案            | i18n（en-US/zh-CN）、菜单项、Agent 系统提示词（"You are ZCode, ..."）、TUI 文案未动                                                                 |
+| 隐藏文件            | `.zcodeignore`、`.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 等未动                                                                   |
+| 其他非目录标识符    | `window.zcode`、`meta.zcode` / `provider.zcode` / `model.zcode` 数据字段、`dev.zcode.*` bundle id、`com.zhipu.zcode.server`、`zcode/` MCP meta 前缀 |
+| vendor 载荷内容     | `packages/desktop/vendor/official-plugins/**` 一字不改（含其中仍写 `.zcode/config.json` 的 zcode-guide 技能文档）；理由见 2.2.2 与 2.6              |
 
 > `README.md`、`NOTICE.md` **已**被本地改写（打包流程、内置插件载荷、自动更新源三节），
 > 不再属于「未改动」，冲突时按本文件对应小节处理。
 
 ## 五、合并冲突决策表
 
-| 冲突场景                                                                                   | 处理方式                                                                                                                                               |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 上游改动第二节所列文件的**非路径行**                                                       | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                         |
-| 上游**新增** home 级路径拼接（`homedir(), ".zcode"`、`~/.zcode`、`$HOME/.zcode`）          | 采用上游后手动改为 `.zcodex`                                                                                                                           |
-| 上游新增/修改 **user vs workspace** 目录 segments                                          | 对照 2.2 的作用域拆分点，仅 user 级改 `.zcodex`                                                                                                        |
-| 上游改 productName / 应用名相关                                                            | 保留本地 `ZCodex` 命名                                                                                                                                 |
-| 上游改项目内 `.zcode`、`.zcode-plugin`、`.zcodeignore` 逻辑                                | 直接采用上游                                                                                                                                           |
-| 上游改品牌文案（i18n、提示词、菜单）                                                       | 直接采用上游                                                                                                                                           |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                             | 直接采用上游（本地未定制，无冲突基础）                                                                                                                 |
-| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项） | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                        |
-| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                           |
-| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）               | 对照 2.6。定义表与入库载荷不一致时改定义表、不改载荷；**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**，其余条目可直接采用上游 |
-| 上游新增数据目录子目录（v2 下新文件等）                                                    | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                          |
+| 冲突场景                                                                                         | 处理方式                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 上游改动第二节所列文件的**非路径行**                                                             | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                         |
+| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`） | 采用上游后手动改为 `.zcodex`                                                                                                                           |
+| 上游新增/修改 **user vs workspace** 目录 segments                                                | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                             |
+| 上游改 productName / 应用名相关                                                                  | 保留本地 `ZCodex` 命名                                                                                                                                 |
+| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                     | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                          |
+| 上游改品牌文案（i18n、提示词、菜单）                                                             | 直接采用上游                                                                                                                                           |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                   | 直接采用上游（本地未定制，无冲突基础）                                                                                                                 |
+| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）       | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                        |
+| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                      | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                           |
+| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                     | 对照 2.6。定义表与入库载荷不一致时改定义表、不改载荷；**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**，其余条目可直接采用上游 |
+| 上游新增数据目录子目录（v2 下新文件等）                                                          | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                          |
 
 ## 六、合并后自查命令
 
 ```bash
-# ① home 级 .zcode 拼接不应出现。
-#    vendor 载荷里官方的 .zcode 是刻意保留的（如 restore-legacy-sessions 扫描旧数据），必须排除。
-grep -rn 'homedir(), "\.zcode"\|join(home[A-Za-z]*, "\.zcode"\|~/.zcode\b\|\$HOME/\.zcode\b' \
-  packages apps scripts --include='*.ts' --include='*.tsx' --include='*.mjs' \
+# ① 数据目录名一律应是 `.zcodex`：home 级拼接与项目级目录名都不应再出现 `.zcode`。
+#    刻意保留、命中属正常的：`.zcodeignore` / `.zcode-plugin/` / `.zcode-beta` /
+#    `.zcode-install-manifest`（隐藏文件名），以及 `window.zcode`、`meta.zcode`、`dev.zcode.*`、
+#    `com.zhipu.zcode.server`、`zcode/` 等非目录标识符（本命令已排除 `com.zcode/` 一类）。
+#    vendor 载荷、mock-cdn 与 bundled-agents 里的 `.zcode` 也是刻意保留的（官方的
+#    restore-legacy-sessions 会扫描旧数据目录，zcode-guide 技能文档仍按官方原样写
+#    `.zcode/config.json`），故一并排除——它们都是产物或第三方资产，不是本仓源码。
+grep -rnE '"\.zcode"|\.zcode[\\/]|~/\.zcode([^a-zA-Z0-9_-]|$)|homedir\(\), "\.zcode"' \
+  packages apps scripts config --include='*.ts' --include='*.tsx' --include='*.mjs' --include='*.md' \
   | grep -v node_modules | grep -v '/dist/' | grep -v '/out/' \
-  | grep -v bundled-agents | grep -v 'packages/desktop/vendor/'
-# 期望：无输出
+  | grep -v bundled-agents | grep -v mock-cdn \
+  | grep -v 'packages/desktop/vendor/' | grep -v 'com\.zcode/'
+# 期望：无输出（2026-10-08 实测改前 89 处、改后 0 处）
 
 # ② 应用名应保持 ZCodex。下面两处命中是**有意保留**的旧标识，不要改：
 #    - packages/desktop/package.json 的 "author": "ZCode"（作者字段，不是产品名）
@@ -449,6 +516,13 @@ comm -12 \
 pnpm typecheck && pnpm lint && pnpm architecture:check --changed
 # 改动过 main / preload / renderer 时额外跑（既有缺口基线 86 个错误，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
+
+# ⑤ 全仓只有 4 个自有测试文件，用 node:test + tsx 跑。
+#    **必须在包目录内跑**：ui 的测试走 `@/*` 别名，从仓库根跑时 tsx 取根 tsconfig（无该别名），
+#    会以 `Cannot find package '@/lib'` 报假失败（2026-10-08 实测）。
+cd packages/services && ../../node_modules/.bin/tsx --test test/*.test.ts
+cd packages/ui       && ../../node_modules/.bin/tsx --test test/nonCliAcpRetirement.test.ts
+# 基线：services 10 passed / ui 6 passed
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
@@ -505,9 +579,13 @@ cd apps/zcode-cli/packages/bootstrap
 
 ## 八、注意事项
 
-1. 本目录（`.zcodex/`）是**文档目录**，与 home 下的数据目录 `~/.zcodex/` 无关，也不会被项目的 `.zcode` 配置扫描机制读取。
+1. 本文档放在 `docs/`。2026-10-08 之前它在 `.zcodex/`，而项目级配置目录改名后也叫 `.zcodex/`，
+   两者同名会造成语义混淆（那个目录现在就是产品的项目配置位置），因此移出——`docs/` 不被任何
+   产品机制扫描，也不在第六节自查命令的扫描范围内，本文里的 `.zcode` 字面量不会干扰自查。
+   反过来说，**不要把文档放进项目的 `.zcodex/`**：那里是产品配置目录，
+   `<项目>/.zcodex/AGENTS.md` 还会被当成工作区的隐藏指令候选文件读取。
 2. 打包产物（`.zcode-runtime/`、`dist/`、`packages/desktop/bundled-agents/`）为构建生成物，改名后重新构建即可，无需手改。
 3. `third-party/inventory.json` 记录了文件内容 sha256，涉及第三方声明文件的合并后需重新生成声明材料（见 `third-party/README.md`）。
 4. **fork 版本号与上游解耦**：根 `package.json` 的 `version` 就是应用版本（`build-metadata.mjs` 的 `appVersion` → electron-builder `extraMetadata.version`），所以每次合并上游后要按 semver 决定 fork 版本：合入上游**功能版**升 minor（如 1.0.0 → 1.1.0），只合修复升 patch，**不要**跟随上游的 `3.14.x` 数字。`publish-github-release.mjs` 按根版本号校验 Release tag。
 5. 若未来要改品牌文案或内部标识符（包名、env、协议），应先更新本文档再动手。
-6. 本文档自身也是本仓文件，改完要跑 `npx oxfmt .zcodex/upstream-merge-notes.md`，否则会进 `fmt:check` 失败清单。
+6. 本文档自身也是本仓文件，改完要跑 `npx oxfmt docs/upstream-merge-notes.md`，否则会进 `fmt:check` 失败清单。

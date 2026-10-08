@@ -38,7 +38,7 @@ const ZCODE_MCP_DESCRIPTOR: DirectoryMcpDescriptor = {
   source: "zcodeagentmcp",
   directorySource: "zcode",
   userConfigDirSegments: [".zcodex", "cli"],
-  workspaceConfigDirSegments: [".zcode"],
+  workspaceConfigDirSegments: [".zcodex"],
   fileName: "config.json",
   format: "json",
   configKeyName: "mcp.servers",
@@ -340,7 +340,7 @@ async function readDirectoryServersFromPreferredSources(
     scope,
     workspacePath,
   );
-  // `.zcode` 是强优先级来源；只要读到 MCP server，同 scope 的 `.agents` 就不再参与。
+  // `.zcodex` 是强优先级来源；只要读到 MCP server，同 scope 的 `.agents` 就不再参与。
   if (zcodeServers.length > 0) {
     return zcodeServers;
   }
