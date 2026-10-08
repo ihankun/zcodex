@@ -166,11 +166,31 @@
 - `packages/ui/src/settings/model-provider-section/Navigation.tsx` — 分组过滤由 `group.id !== "custom" || group.items.length > 0` 改为 `group.items.length > 0 || (group.id === "preset" && presetLoading)`：空分组不显示，但预设分组在加载中保持可见，避免侧栏跳动。
 - `packages/ui/src/settings/model-provider-section/useModelProviderNavigation.ts` — Start Plan 条目只在对应预设可见时才注入，避免品牌入口隐藏后智谱登录项被塞回侧栏。
 
-#### 2.3.6 只有一个供应商时不显示厂商前缀（2026-09-29）
+#### 2.3.6 触发器不显示厂商前缀，tooltip 仍显示完整来源（2026-10-08）
 
-`packages/ui/src/v4/composer/modelTriggerDisplay.ts` — 在 `resolveV4ModelTriggerDisplay` 里，
-非空供应商数 ≤ 1 时直接返回 `{ fullLabel: modelLabel, modelLabel }`，不再拼 `${providerName}/` 前缀
-（只有一个供应商时前缀没有区分意义，反而冗长）。
+`packages/ui/src/v4/composer/modelTriggerDisplay.ts` + `V4ComposerToolbar.tsx` —— composer 的
+模型触发器只显示模型名；**鼠标悬停的 tooltip 与 aria-label 仍显示 `厂商/模型`**。
+
+两处配合，缺一不可：
+
+- `resolveV4ModelTriggerDisplay` 不再产出 `providerPrefix`（删掉「非 family 且非单供应商」那段），
+  返回 `{ fullLabel, modelLabel }`：`fullLabel` 仍是完整标签（非 family 供应商会带
+  `${providerName}/`），`modelLabel` 是裸模型名。
+- `V4ComposerToolbar.tsx` 把 `triggerLabel` 从 `fullLabel` 改成 `modelLabel`。**必须改**：
+  `RollingToolbarLabel` 的规则是「`prefix` 与 `value` 同时存在才渲染 `prefix+value`，否则渲染
+  `label`」——`providerPrefix` 不再产出后，trigger 的可见文字完全由 `label` 决定，而
+  `tooltipTitle` / aria-label 仍走 `fullLabel`。只改其中一处会得到「前缀回到触发器上」（改反）
+  或「tooltip 也丢了来源」（改少了）。
+
+- 效果：宽窄容器下 trigger 都只有模型名（等价于上游的 compact 态）。
+- 历史：2026-09-29 起是「非空供应商数 ≤ 1 时不显示」，2026-10-08 改为一律不显示。
+- 内置 family 供应商（`account:zai-*` / `account:bigmodel-*`）的 tooltip 也**不带**厂商名，
+  这是 `formatProviderModelLabel` 的上游规则（连接名拼进模型文案会重复展示套餐信息），本地未改。
+- `providerPrefix` 字段与 `V4ComposerToolbar.tsx` 的 `triggerLabelPrefix` 透传**保留**
+  （现在恒为 `undefined`），以维持与上游最小差异。上游若改这段，不要恢复拼前缀。
+- 模型不在当前菜单里时走另一条分支（`!selectedGroup || !selectedItem`），仍用
+  `resolveV4ModelTriggerLabel` 的结果，语义未变。
+- 由 `packages/ui/test/modelTriggerDisplay.test.ts` 钉住（本地定制的回归防线，合并后要跑）。
 
 ### 2.4 启动与桌面行为
 
@@ -517,12 +537,14 @@ pnpm typecheck && pnpm lint && pnpm architecture:check --changed
 # 改动过 main / preload / renderer 时额外跑（既有缺口基线 86 个错误，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
 
-# ⑤ 全仓只有 4 个自有测试文件，用 node:test + tsx 跑。
+# ⑤ 自有测试文件很少，用 node:test + tsx 跑。
 #    **必须在包目录内跑**：ui 的测试走 `@/*` 别名，从仓库根跑时 tsx 取根 tsconfig（无该别名），
 #    会以 `Cannot find package '@/lib'` 报假失败（2026-10-08 实测）。
 cd packages/services && ../../node_modules/.bin/tsx --test test/*.test.ts
-cd packages/ui       && ../../node_modules/.bin/tsx --test test/nonCliAcpRetirement.test.ts
-# 基线：services 10 passed / ui 6 passed
+cd packages/ui       && ../../node_modules/.bin/tsx --test test/*.test.ts
+# 基线：services 10 passed / ui 10 passed（2026-10-08）
+#    ui/test/modelTriggerDisplay.test.ts 钉的是 2.3.6「一律不显示厂商前缀」这条本地定制，
+#    合并上游后必须跑：改前多供应商会产出 providerPrefix，该测试会红。
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，

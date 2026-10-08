@@ -1043,7 +1043,9 @@ function V4ComposerModelControlsImpl({
         <ModelConfigSelect
           modelGroups={modelSelectGroups}
           normalizedValue={normalizedModelValue}
-          triggerLabel={modelTriggerDisplay.fullLabel}
+          // 本地定制：触发器只显示模型名，来源留给 tooltipTitle（走 fullLabel）。
+          // 不要改回 fullLabel——那会把 `厂商/` 前缀带回触发器（见 docs/upstream-merge-notes.md 2.3.6）。
+          triggerLabel={modelTriggerDisplay.modelLabel}
           triggerLabelPrefix={modelTriggerDisplay.providerPrefix}
           triggerLabelValue={modelTriggerDisplay.modelLabel}
           triggerLabelPrefixClassName="composer-provider-prefix inline group-data-[composer-provider-compact=true]/toolbar:hidden"

@@ -95,8 +95,9 @@ export function resolveV4ModelTriggerDisplay({
   providerId: string | undefined;
   providerName?: string;
 }): V4ModelTriggerDisplay {
-  // 把 provider/model 预先拼成单一字符串后，响应式布局只能整段隐藏或依赖
-  // 平台 JS 分支裁剪；这里保留结构化前缀，让 composer 容器断点统一决定可见密度。
+  // fullLabel 是完整标签：非 family 供应商会带 `${providerName}/`。本地定制不把它用作触发器
+  // 文字（触发器显示 modelLabel，见 V4ComposerToolbar 的 triggerLabel），而是留给 tooltip 与
+  // aria-label，让悬停时仍能看到来源。
   const fullLabel = resolveV4ModelTriggerLabel({
     modelGroups,
     normalizedValue,
@@ -113,23 +114,9 @@ export function resolveV4ModelTriggerDisplay({
   }
 
   const modelLabel = selectedItem.name;
-  const normalizedProviderName = providerName?.trim() || providerId;
-  if (
-    !normalizedProviderName ||
-    (providerId && resolveModelProviderFamilyIdByProviderId(providerId))
-  ) {
-    return { fullLabel, modelLabel };
-  }
-
-  // 只维护了一个供应商时，厂商前缀没有区分意义反而显得冗长，直接只显示模型名。
-  const providerCount = modelGroups.filter((group) => group.items.length > 0).length;
-  if (providerCount <= 1) {
-    return { fullLabel: modelLabel, modelLabel };
-  }
-
-  return {
-    fullLabel,
-    providerPrefix: `${normalizedProviderName}/`,
-    modelLabel,
-  };
+  // 本地定制：不再产出 providerPrefix（上游用它给 composer 容器断点决定前缀可见密度）。
+  // `RollingToolbarLabel` 只在 prefix 与 value 同时存在时渲染 `prefix+value`，否则渲染 label，
+  // 所以去掉 providerPrefix 之后，触发器的可见文字完全由调用方传的 triggerLabel 决定——
+  // V4ComposerToolbar 那里传的是 modelLabel，两处必须一起改（见 docs/upstream-merge-notes.md 2.3.6）。
+  return { fullLabel, modelLabel };
 }
