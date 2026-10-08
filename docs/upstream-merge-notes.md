@@ -12,12 +12,14 @@
 
 | 定制                                                      | 影响面                                      | 详见 |
 | --------------------------------------------------------- | ------------------------------------------- | ---- |
-| 打包应用名 `ZCode` → `ZCodex`                             | 7 个文件                                    | 2.1  |
+| 打包应用名 `ZCode` → `ZCodex`，主窗口标题同步             | 9 个文件                                    | 2.1  |
 | 数据目录统一改名 `.zcode` → `.zcodex`（home 级 + 项目级） | 99 个文件（home 字样）+ 约 40 处（项目级）  | 2.2  |
 | UI 定制：Logo / 布局 / 模型设置 / 供应商入口              | `packages/ui`                               | 2.3  |
 | 启动与桌面行为：force-gate、Dock 图标、DMG 底图           | `packages/desktop/src/main`、`build/`       | 2.4  |
 | 桌面自动更新改走 GitHub Release，未签名构建回退手动安装   | desktop + shared + client + ui + web + 构建 | 2.5  |
 | 内置插件载荷入库                                          | 构建流程与产物                              | 2.6  |
+| 用户可见产品名与文案统一为 `ZCodex`                       | ui i18n / web / CLI / 托盘 / 安装器文案     | 2.7  |
+| Finder 右键「在ZCodex中打开」的 Services 注册             | desktop main（上游代码，仅改文案）          | 2.8  |
 
 **改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面四处**改了内部行为**，合并时最容易出事：
 
@@ -34,11 +36,12 @@
 
 ## 二、本地定制清单（合并冲突时保护本地版本）
 
-### 2.1 应用名（7 个文件）
+### 2.1 应用名与窗口标题（9 个文件）
 
 | 变更       | 原值                                    | 现值                                       |
 | ---------- | --------------------------------------- | ------------------------------------------ |
 | 打包应用名 | `ZCode` / `ZCode Dev` / `ZCode Preview` | `ZCodex` / `ZCodex Dev` / `ZCodex Preview` |
+| 主窗口标题 | `ZCode`                                 | `ZCodex`                                   |
 
 - `packages/desktop/package.json` — `productName: "ZCodex"`
 - `packages/desktop/scripts/desktop-product-identity.mjs` — 正式版 `ZCodex`、Preview 版 `ZCodex Preview`
@@ -47,10 +50,27 @@
 - `packages/desktop/src/main/desktopLinuxDeepLinkRegistration.ts` — Linux `.desktop` 注册名回退值 `"ZCodex"`
 - `packages/desktop/electron-builder.config.js` — `.app` 路径回退名 `?? "ZCodex"`
 - `packages/services/src/paths.ts` — Windows 禁止目录守卫（`Program Files\ZCodex`、`...\Programs\ZCodex`）
+- `packages/desktop/src/renderer/index.html` — `<title>ZCodex</title>`（2026-10-08 新增）
+- `packages/shared/src/process-names.ts` — `formatZCodeRendererProcessName` 里的默认标题特例（2026-10-08 新增）
+
+**窗口标题这条容易被忽略，但它是最外显的应用名之一**：macOS Dock 图标右键菜单里带勾的第一行
+不是应用名，而是「当前窗口」项显示的**窗口标题**，即 `index.html` 的 `<title>`。改名前 `lsappinfo`
+/ `Info.plist` / Spotlight 全都已经是 `ZCodex`，只有那一行还是 `ZCode`——排查时别只看 bundle 身份。
+
+两处必须一起改：`<title>` 改了而 `process-names.ts` 的特例没改，
+`document.title` 不再命中默认值分支，渲染进程名会从 `zcode-renderer-main` 退化成
+`zcode-renderer-zcodex`，在**资源管理器**的进程列表里直接可见
+（`resourceManagerProcessNames.ts` / `resourceManagerWindow.ts` 都用它给渲染进程命名）。
 
 注意 `packages/desktop/package.json` 的 `"author": "ZCode"` 与
 `packages/desktop/src/main/mcpUserDirectory/legacy.ts` 里的 `join(appData, "ZCode", …)`
 是**有意保留**的（作者字段、旧版 appData 迁移路径），别当成漏改。
+
+尚未改动的同类品牌字样（要改就得成组决定，见第四节）：`packages/web/index.html` 的
+`<title>ZCode</title>`（网页标签标题）、`packages/desktop/src/renderer/cua-permission-panel.html`
+的 `ZCode Computer Use`、`apps/zcode-cli/packages/debug/index.html` 的 `ZCode 调试台`，
+以及 `process-names.ts` 里 `"ZCode - "` 远程窗口前缀（当前 desktop 没有任何代码设置这种标题，
+分支是否可达未证实，故未动）。
 
 ### 2.2 数据目录：`.zcode` → `.zcodex`（home 级与项目级统一，2026-10-08 起）
 
@@ -390,6 +410,84 @@ ZCODE_PLUGIN_SEED_INCOMPLETE 告警：0 条
 
 即 14 条内置定义**全部**落盘，不再有被跳过的插件。
 
+### 2.7 用户可见产品名与文案统一为 `ZCodex`（2026-10-08）
+
+把用户会看到的产品名从 `ZCode` 改成 `ZCodex`。**内部标识符一律不动**（见第四节），改的只是
+「用户看到的名字与句子」。合并上游时这些文件按本节的意图保留本地版本。
+
+| 位置                                                                                                                                                            | 说明                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `packages/ui/src/i18n/locales/en-US.ts`、`zh-CN.ts`                                                                                                             | 全部用户可见文案里的产品名（约 100 处/文件）——启动屏、引导、Bot、分享导入、设置页等，是最大的一块 |
+| `apps/zcode-cli/packages/i18n/src/locales/en-US.ts`、`zh-CN.ts`                                                                                                 | 仅 TUI 的 `starting`（`ZCode Protocol` 是协议名，保留）                                           |
+| `apps/zcode-cli/packages/tui/src/app-sidebar.tsx`                                                                                                               | `PRODUCT_NAME`（宽度由 `displayWidth` 推导，改长自动适配）                                        |
+| `apps/zcode-cli/packages/debug/index.html`                                                                                                                      | 调试台页面标题                                                                                    |
+| `packages/web/index.html`、`packages/web/src/main.tsx`                                                                                                          | 网页标签标题与各路由的 `document.title`                                                           |
+| `packages/web/src/auth/webAuthLocale.ts`                                                                                                                        | 登录页品牌名                                                                                      |
+| `packages/web/src/share/ConversationShareLandingPage.tsx`、`share/conversationSharePreviewClient.ts`、`share/mockConversationSharePreviewClient.ts`             | 公开分享页的品牌与文案（含非 mock 客户端的校验提示）                                              |
+| `packages/ui/src/lib/builtinSkillI18n.ts`                                                                                                                       | 内置技能描述文案（Browser Use / 插件创建等）                                                      |
+| `packages/ui/src/v4/ConversationShareReadonlyTimeline.tsx`                                                                                                      | 只读分享页的「需要更新版本」提示                                                                  |
+| `packages/ui/src/app-shell/WorkspaceShellLayout.tsx`                                                                                                            | 工作区标题属性 `ZCode / <目录名>`                                                                 |
+| `packages/ui/src/v4/conversationProjectionStore.ts`                                                                                                             | 运行时回收后展示的错误文案（**只改展示串，`includes(...)` 匹配串不动**）                          |
+| `apps/zcode-cli/packages/debug/src/App.tsx`                                                                                                                     | 调试台页面可见标题（`index.html` 的 `<title>` 另算一处）                                          |
+| `packages/ui/src/WorkspaceSidebarFooter.tsx`、`WorkspaceSidebar/WorkspaceSidebarCollapsedRail.tsx`、`WelcomeScreen.tsx`、`onboarding/OnboardingWelcomeView.tsx` | 侧栏账号兜底名、logo 的 `alt` 与 `aria-label`                                                     |
+| `packages/shared/src/desktopMenu.ts`                                                                                                                            | Windows/Linux 托盘 tooltip 与菜单项文案                                                           |
+| `packages/desktop/src/renderer/cua-permission-panel.html`、`renderer/cuaPermissionPanelMessages.ts`                                                             | CUA 权限面板的窗口标题、可见名称与文案                                                            |
+| `packages/desktop/src/main/about.ts`                                                                                                                            | About 面板：`ABOUT_APPLICATION_NAME`、标题与版权行                                                |
+| `packages/desktop/src/main/desktopWindowsOpenFolderContextMenu.ts`                                                                                              | Windows 资源管理器右键菜单文案（**注册表键名 `ZCode.OpenInZCode` 不动**，同 Finder 那条的理由）   |
+| `packages/shared/src/zcode-slash-command-help.ts`                                                                                                               | 斜杠命令帮助文本里的「credential store」                                                          |
+| `packages/zcode-server-cli/src/cli.ts`                                                                                                                          | `ZCodex Server ...` / `ZCodex TUI` 等 stdout 文案                                                 |
+| `packages/services/src/bots/messages.ts`、`bots/{feishu,telegram,weixin}ChannelRuntime.ts`、`bots/providers/weixinProvider.ts`                                  | Bot 在聊天里发出的文案（helpTitle、远端未连接提示、窗口占用提示）                                 |
+| `packages/desktop/build/installer.nsh`                                                                                                                          | 仅「安装目录含数据目录」弹窗文案（NSIS 函数名与 `ZCode-*.log` 日志文件名不动）                    |
+
+**刻意不改（要改先想清楚）：**
+
+- `ZCode Protocol`：协议名，属内部标识符。
+- **Agent 系统提示词**（`core/src/context/sections/cli-prefix.ts` 的 "You are ZCode, an interactive
+  coding agent"、`subagent/explore.ts`、`runtime/methods/workspace-generate-text.ts` 的连通性探针）：
+  改它会改变模型的自我认知，并动到 **prompt 缓存前缀**，属行为改动，需单独决策。
+- `packages/shared/src/openrouter-attribution.ts` 的 `X-OpenRouter-Title: "ZCode"`：发给第三方服务的
+  归属标识。
+- `packages/services/src/runtime-tools/appCaCert.ts` 的 CA `organizationName: "ZCode"`：改了会让用户
+  已信任的本地 CA 与实际签发的证书主体不一致，必须和迁移一起考虑。
+- `packages/shared/src/plugin-display-name.ts` 的 `zcode: "ZCode"`：插件 slug → 显示名的映射，与插件 id 绑定。
+- `packages/web/src/share/ConversationShareLandingPage.tsx` 的 `ZCODE_DOWNLOAD_URL`：仍指
+  `https://zcode.z.ai`（上游站点）。改名后它与「下载 ZCodex」的文案不再对应，改指 fork 的 Release 页
+  属产品决策，未擅自改。
+- 代码注释里提到 `ZCode` 的地方（不影响用户）。
+- **匹配 agent/runtime 输出的字符串**（改了会让识别失效，因为产出方仍是 `ZCode` 前缀的文本）：
+  `packages/ui/src/v4/conversationProjectionStore.ts` 的 `message.includes("ZCode agent transport
+closed" / "ZCode Protocol client disposed" / "ZCode Protocol client is disposed" / "ZCode Agent
+runtime is not running")`、`packages/ui/src/lib/zcodeUiError.ts` 的
+  `GENERIC_ZCODE_UI_ERROR_MESSAGES`（含 `"ZCode session failed"`）。
+- `packages/ui/src/hooks/workspacePrepareRpc.ts` 的 `version: "ZCode Protocol/1"`：协议版本串。
+- `packages/ui/src/feedback/feedbackSubmit{Submission,Description}.ts` 的
+  `FEEDBACK_ZCODE_AGENT_LABEL = "ZCode Agent"`：一个值同时进反馈**载荷**与描述文案，改它会改变上报数据。
+- desktop / services 的内部错误与日志文本（如 `"ZCode task service is not initialized."`、
+  `"ZCode credentials are corrupt"`、`"ZCode agent warmup ..."`）：面向排查，不是产品名展示。
+- `packages/desktop/src/host/browserControlMainBridge.ts` 的 `"ZCode In-app Browser"`：
+  内嵌浏览器（CDP/Playwright）看到的浏览器名。
+- `apps/zcode-cli/packages/browser-use-plugin/**` 的 `SKILL.md` 与 `docs/*.md`：面向 Agent 的
+  技能文档，随插件分发（改动等同于改 prompt 文本，且与 `.agents/skills` 镜像副本相关）。
+
+### 2.8 Finder 右键「在ZCode中打开」是谁注册的（2026-10-08）
+
+这条右键菜单**不是安装包注册的，而是应用每次启动时写的** macOS Services
+（Automator workflow + `NSServices`），实现在 `packages/desktop/src/main/desktopFinderOpenFolderWorkflow.ts`
+（上游代码，本轮只改文字）：
+
+- 落点 `~/Library/Services/Open in ZCode.workflow/`；菜单里显示的文字来自 `Contents/Info.plist` 的
+  `CFBundleName` 与 `NSServices[0].NSMenuItem.default`（两者都取 `SERVICES_MENU_LABELS[locale]`）。
+- 写完调 `/System/Library/CoreServices/pbs -update` 刷新 Services 索引；仅内容变化时重写，
+  所以改文案后**只要重启应用**菜单项就会就地更新，不会留下旧副本。
+- 作用域：`NSRequiredContext.NSApplicationIdentifier = com.apple.finder`，且 `NSSendFileTypes`
+  只收 `public.folder` / `public.directory`——只有右键**文件夹**时才有这一项。
+- 本地定制只改 `SERVICES_MENU_LABELS`（`在ZCode中打开` → `在ZCodex中打开`、`Open in ZCode` →
+  `Open in ZCodex`）。目录名 `Open in ZCode.workflow`、`CFBundleIdentifier`
+  (`dev.zcode.app.finder-open-workflow`)、`WORKFLOW_VERSION` 都保持原样：改目录名会在
+  `~/Library/Services` 留下旧副本，Finder 里就出现两个同名项，得再写清理逻辑。
+- **目前没有开关可以关掉它**：`installFinderOpenFolderWorkflow` 每次启动都执行，删掉目录会被重建。
+  要能关就得加设置项（未实现）。
+
 ## 三、踩坑记录（不要再重复）
 
 - **`packages/desktop/src/main/index.ts` 的 `@zcode/shared` 导入列表必须保留 `ZCODE_PRODUCT_FLAVOR`。**
@@ -478,7 +576,7 @@ ZCODE_PLUGIN_SEED_INCOMPLETE 告警：0 条
 | IPC 通道名          | `zcode-task`、`zcode:select-file` 等 channels.ts 通道字符串未动（2.5 新增的两个通道除外）                                                           |
 | 协议常量            | `ZCODE_PROTOCOL_NAME = "ZCode Protocol"`、`com.zcode/` MCP 命名空间、`Symbol.for("zcode.*")` 未动                                                   |
 | 深链 scheme         | `zcode://`（OAuth 回调、share/import、workspace/open）未动                                                                                          |
-| 品牌文案            | i18n（en-US/zh-CN）、菜单项、Agent 系统提示词（"You are ZCode, ..."）、TUI 文案未动                                                                 |
+| 品牌文案            | 用户可见文案**已**统一为 `ZCodex`（见 2.7）；仍未动的只有 Agent 系统提示词（"You are ZCode, ..."）、协议名 `ZCode Protocol` 与第三方归属标识        |
 | 隐藏文件            | `.zcodeignore`、`.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 等未动                                                                   |
 | 其他非目录标识符    | `window.zcode`、`meta.zcode` / `provider.zcode` / `model.zcode` 数据字段、`dev.zcode.*` bundle id、`com.zhipu.zcode.server`、`zcode/` MCP meta 前缀 |
 | vendor 载荷内容     | `packages/desktop/vendor/official-plugins/**` 一字不改（含其中仍写 `.zcode/config.json` 的 zcode-guide 技能文档）；理由见 2.2.2 与 2.6              |
@@ -525,12 +623,18 @@ grep -rnE '"\.zcode"|\.zcode[\\/]|~/\.zcode([^a-zA-Z0-9_-]|$)|homedir\(\), "\.zc
 #      （从旧版 ZCode 的 appData 目录迁移数据的历史路径）
 grep -rn '"ZCode"\|productName.*ZCode[^ ]' packages/desktop --include='*.json' --include='*.ts' --include='*.mjs'
 
-# ③ fmt 失败清单 ∩ 本地改过/新增的文件，应为空（README.md 例外：上游版本本身就不干净）
-#    上游自带失败基线：32 个（2026-09-30）。这个总数只增不减是正常的（上游新文件不跑 oxfmt），
+# ③ fmt 失败清单 ∩ 本地改过/新增的文件，应为空。
+#    上游自带失败基线：31 个（2026-10-08）。总数只增不减是正常的（上游新文件不跑 oxfmt），
 #    真正要盯的是「交集」有没有多出自己改过的文件。
+#    例外（上游版本本身就不干净，本 fork 只动了其中一行文案；格式化它们会在上游文件上产生
+#    几十到几百行 diff，与「只格式化本地改动的文件」冲突）：README.md、
+#    packages/services/src/bots/{feishuChannelRuntime,telegramChannelRuntime,weixinChannelRuntime}.ts、
+#    packages/services/src/bots/providers/weixinProvider.ts
 comm -12 \
-  <(pnpm fmt:check 2>&1 | grep -E '\([0-9]+m?s\)$' | sed -E 's/ \([0-9]+m?s\)$//' | sort) \
-  <(git diff --name-only 29628c9 -- . ':(exclude)packages/desktop/vendor' | sort)
+  <(pnpm fmt:check 2>&1 | grep -E '\([0-9]+m?s\)$' | sed -E 's/ \([0-9]+m?s\)$//' | sed 's/^[^ ]* //' | sort) \
+  <(git diff --name-only 29628c9 -- . ':(exclude)packages/desktop/vendor' | sort) \
+  | grep -vE '^README\.md$|^packages/services/src/bots/(feishuChannelRuntime|telegramChannelRuntime|weixinChannelRuntime)\.ts$|^packages/services/src/bots/providers/weixinProvider\.ts$'
+# 期望：无输出（2026-10-08 实测通过）
 
 # ④ 必跑验证
 pnpm typecheck && pnpm lint && pnpm architecture:check --changed
@@ -542,9 +646,13 @@ pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
 #    会以 `Cannot find package '@/lib'` 报假失败（2026-10-08 实测）。
 cd packages/services && ../../node_modules/.bin/tsx --test test/*.test.ts
 cd packages/ui       && ../../node_modules/.bin/tsx --test test/*.test.ts
-# 基线：services 10 passed / ui 10 passed（2026-10-08）
-#    ui/test/modelTriggerDisplay.test.ts 钉的是 2.3.6「一律不显示厂商前缀」这条本地定制，
-#    合并上游后必须跑：改前多供应商会产出 providerPrefix，该测试会红。
+cd packages/desktop  && ../../node_modules/.bin/tsx --test test/*.test.ts
+# 基线：services 10 passed / ui 10 passed / desktop 3 passed（2026-10-08）
+#    ui/test/modelTriggerDisplay.test.ts 钉的是 2.3.6「触发器不显示厂商前缀、tooltip 保留来源」
+#      这条本地定制，合并上游后必须跑：改回上游实现会产出 providerPrefix，该测试会红。
+#    desktop/test/rendererWindowTitle.test.ts 钉的是 2.1 里「窗口标题 ↔ 渲染进程名」的耦合：
+#      它读 renderer/index.html 的 `<title>` 喂给 formatZCodeRendererProcessName，断言得到
+#      `zcode-renderer-main`。只把标题单边改回 `ZCode`（或只改一处）就会红。
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
