@@ -93,3 +93,11 @@ packages/desktop/.e2e-network-capture/
 
 # 工程师工具的本地工作目录（会话 history / 用户偏好 / 项目 wiki 文档），非项目源码。
 .engineer/
+
+# ZCodex 在本仓工作时的项目级机器产物。这里只列纯机器自有、且产品未自忽略的两处：
+# workflow-drafts / workflow-runs 由产品自己在目录内写 `.gitignore: *`，无需重复；
+# skills / commands / agents / workflows / config.json 是应随仓库提交的资产（产品文档
+# 明确项目档 workflow 随仓库提交），所以**不能**整目录忽略 `.zcodex/`。
+.zcodex/plans/
+.zcodex/agent-memory/
+.zcodex/agent-memory-local/
