@@ -113,8 +113,8 @@ export const desktopMenuMessages: Record<Locale, DesktopMenuLocaleMessages> = {
     "desktopMenu.help.installAndRestart": "安装并重启（{version}）",
     "desktopMenu.help.restartToUpdate": "重启以更新（{version}）",
     "dock.menu.showCurrentWindow": "显示当前窗口",
-    "tray.tooltip": "ZCode",
-    "tray.menu.openZCode": "打开 ZCode",
+    "tray.tooltip": "ZCodex",
+    "tray.menu.openZCode": "打开 ZCodex",
     "tray.menu.quit": "退出",
   },
   "en-US": {
@@ -168,8 +168,8 @@ export const desktopMenuMessages: Record<Locale, DesktopMenuLocaleMessages> = {
     "desktopMenu.help.installAndRestart": "Install and restart ({version})",
     "desktopMenu.help.restartToUpdate": "Restart to update ({version})",
     "dock.menu.showCurrentWindow": "Show current window",
-    "tray.tooltip": "ZCode",
-    "tray.menu.openZCode": "Open ZCode",
+    "tray.tooltip": "ZCodex",
+    "tray.menu.openZCode": "Open ZCodex",
     "tray.menu.quit": "Quit",
   },
 };
