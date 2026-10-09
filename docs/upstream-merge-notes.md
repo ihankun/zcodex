@@ -214,19 +214,49 @@
 
 #### 2.3.7 帮助菜单隐藏上游产品入口（2026-10-09）
 
-`packages/ui/src/WorkspaceHelpMenuButton.tsx` — 移除菜单里指向上游产品服务的四项：
-**产品文档 / 用户社群 / 问题上报 / 给产品提需求**；只保留「资源管理器 / 检查更新 / 关于 ZCodex」。
+两处菜单都要改，它们是**不同的东西**，别只改一处：
+
+**① app 内的帮助下拉**（`packages/ui/src/WorkspaceHelpMenuButton.tsx`）——移除指向上游产品服务的
+四项：**产品文档 / 用户社群 / 问题上报 / 给产品提需求**；只保留「资源管理器 / 检查更新 / 关于 ZCodex」。
 顺带删掉了现在会打头的分隔线，并加了「非桌面端不渲染该按钮」的门（剩下三项全是桌面专属，
 Web 上否则会剩一个点开是空的菜单）。
+
+**② macOS 原生菜单栏的「帮助」菜单**（`packages/desktop/src/main/desktopApplicationMenu.ts`）——
+移除 **更新日志**（`helpWhatsNew` → `OpenChangelog`）与 **问题上报**（`helpFeedback` → `OpenFeedback`）。
+更新日志那项连同它后面的分隔线一起删（在 macOS 上它原本是菜单第一项，留着会让菜单以分隔线开头）；
+非 macOS 分支（关于 / 检查更新）自带的分隔线保留。菜单剩下：切换开发者工具 / 资源管理器 /
+导出日志 / 清除所有数据（后两者之间、以及资源管理器之前的分隔线仍在）。
 
 - `packages/ui/src/lib/helpMenuActions.ts` **保留为不可达代码**（它只服务被移除的两项）：
   理由同第三节的 `forceUpdateGuard`——留着与上游逐字节一致，删除会让上游每次改动都产生
   delete/modify 冲突。已知代价：`pnpm knip` 会把它列进 unused files（基线噪音）。
-- **未动的地方**（要一起隐藏得另外改）：macOS 原生 Help 菜单里仍有「问题上报」
-  （`desktopMenu.ts` 的 `helpFeedback`，与导出日志、清除所有数据同处一个菜单）；
-  命令面板（`quickpick/quickPickCommands.ts`）里也仍有这四个命令。
-- i18n 的 `workspaceHeader.help.{docs,community,issueReport,productRequest}` 文案保留，
-  它们仍是命令面板与原生菜单的文案来源。
+- `DesktopCommandIds.OpenChangelog` 的 handler（`desktopCommandHandlers.ts`）与
+  `desktopMenu.ts` 的 `helpWhatsNew` / `helpFeedback` 文案**保留**：前者与上游逐字节一致、
+  后者仍是命令面板等处的文案来源（同下条）。
+- **仍未动**：命令面板（`quickpick/quickPickCommands.ts`）里仍有这四个命令；
+  i18n 的 `workspaceHeader.help.{docs,community,issueReport,productRequest}` 与
+  `desktopMenu.ts` 的 `titleBar.menu.help.{whatsNew,feedback}` 文案都保留（它们仍是那处的文案来源）。
+
+#### 2.3.8 左下角账号菜单移除「升级」入口（2026-10-09）
+
+`packages/ui/src/WorkspaceSidebarFooterUsageSummary.tsx` 的菜单内容里，GLM 套餐的
+**「升级 / 续费」项**（`TID_SIDEBAR_CODING_PLAN_UPGRADE_BUTTON`）已移除；同一组的
+「使用统计」保留。它原本「始终显示」，并带 Coding Plan entry gate 与 funnel 埋点。
+
+**连带清理**（做法同 2.3.3「删 UI 元素 + 清理传递链」）：
+
+- `WorkspaceSidebarFooterUsageSummary.tsx`：删掉该菜单项，以及只为它服务的导入
+  （`useCodingPlanEntryGate`、`isMaxCodingPlanSnapshot`、`createCodingPlanFunnelContext`、
+  `resolveCodingPlanEntryPlanState`、`resolveSidebarCodingPlanUpgradeFallbackProviderId`）与局部量
+  （`upgradeActionLabelId`、`upgradeProviderSnapshot`）；state hook 里为它计算的
+  `upgradeTargetProviderId` / `selectedUpgradeProviderId` 一并删除。
+- `WorkspaceSidebarFooter.tsx`、`WorkspaceSidebar.tsx`、`SettingsPage.tsx`：`onUpgradeClick`
+  这条 prop 链、两侧的 `handleOpenCodingPlanUpgrade*` 与 `useCodingPlanUpgradeDialog()` 解构都已删除。
+- **刻意保留**：`WorkspaceSidebarFooterUsageSummaryContent` 的 `state` prop 现在不再被读取，
+  但**保留声明**——清掉它会牵动调用方（footer，以及同文件里那个全仓已无人引用的包装组件
+  `WorkspaceSidebarFooterUsageSummary`）与 footer 的 state 计算，收益不抵改动面。
+  另外 `CodingPlanUpgradeDialogProvider` 与套餐卡上的升级入口**没动**：设置页等处仍有其他升级入口。
+- i18n 的 `sidebar.usage.plan.upgrade` / `.renew` 文案保留（仍是套餐卡的文案来源）。
 
 ### 2.4 启动与桌面行为
 
@@ -484,6 +514,40 @@ runtime is not running")`、`packages/ui/src/lib/zcodeUiError.ts` 的
   内嵌浏览器（CDP/Playwright）看到的浏览器名。
 - `apps/zcode-cli/packages/browser-use-plugin/**` 的 `SKILL.md` 与 `docs/*.md`：面向 Agent 的
   技能文档，随插件分发（改动等同于改 prompt 文本，且与 `.agents/skills` 镜像副本相关）。
+
+#### 2.7.1 补漏：夹在句子里的产品名（2026-10-09）
+
+上一轮漏了一类：**产品名夹在句子中间**的文案（`"关于 ZCode"`、`"无法解压 ZCode 远程资源"`），
+因为当时用的是「裸 `"ZCode"` 精确匹配」。这次补上，扫描模式改为
+**「引号内出现『空格 + ZCode』」**（`rg -nP '"[^"]*[ ]ZCode(?!x)'`）——这个模式专抓夹在句子里的产品名，
+比裸引号匹配可靠。补改的文件：
+
+- `packages/shared/src/desktopMenu.ts` — `titleBar.menu.help.about`：`关于 ZCode` → `关于 ZCodex`（en 同理）。
+  这是 macOS **原生菜单栏**「关于」项的文案来源；UI i18n 里同名 key 上一轮已改，所以当时表现为
+  「app 内菜单已对、原生菜单还是旧名」。
+- `packages/desktop/src/main/desktopOAuthDeepLink.ts` — 深链确认弹窗的标题与正文（4 条）。
+- `packages/server/src/remote/remoteAssetPreflight.ts` — 远端缺少 curl/wget/tar/sha256sum 时的
+  用户可见错误（3 条）。
+- `packages/shared/src/plugin-marketplaces.ts` — 官方市场的描述文案。
+
+**这次扫描同时确认了几处「不能改」，别当成漏改：**
+
+- `packages/services/src/file/workspaceFileIgnore.ts` — 生成的 `.zcodeignore` 模板里仍写 ZCode。
+  其中**两行 marker 是被逐行比较的**（`line.trim() === WORKSPACE_FILE_SEARCH_IGNORE_*_MARKER`，
+  用于「从 .gitignore 同步 / 恢复默认规则」的分区识别）；只改 header 不改 marker 会让生成的
+  文件里两个名字混用，所以整份保持原样。
+- `packages/desktop/src/main/forceUpdateGuard.ts`、`forceUpdatePrompt.ts` — 文案随「保留为不可达代码」
+  一并保留（§2.4.1）。
+- CLI/Agent 提示词与工具描述（`core/src/context/sections/{cli-prefix,identity}.ts`、
+  `bootstrap/src/builtin-prompt-command.ts`、`core/src/system-reminder/incoming-message.ts`、
+  `core/src/tool/handlers/{agent,read}.ts`、`core/src/runtime/helpers/attachment-path-reference.ts` 等）：
+  属 prompt 类，改它会动 prompt 缓存前缀（见本节开头）。
+- 内部诊断文本（`zcode-server-cli` 的 stderr、credential 读取错误、telemetry 状态校验、
+  `logger.*` 文案）：面向排查，不是产品名展示。
+- **尚未处理（用户可见，但要单独确认）**：`apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts`
+  里内置插件的商店描述与 `zcode-guide` 的 `displayName`（约 10 处）。该文件是合并最敏感的一处
+  （必须保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`，见 2.6），
+  改这批 listing 文案不影响 seed，但要和上游改动一起看，故留待单独处理。
 
 ### 2.8 Finder 右键「在ZCode中打开」是谁注册的（2026-10-08）
 
