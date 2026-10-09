@@ -1,5 +1,4 @@
-import { useCodingPlanEntryGate } from "@/settings/CodingPlanEntryButton.js";
-/* eslint-disable max-lines -- footer 套餐徽标、升级入口与 entitlement 探测共用同一份
+/* eslint-disable max-lines -- footer 套餐徽标与 entitlement 探测共用同一份
    provider 选择与 family 过滤上下文，拆文件会让 zai/bigmodel 对称性难以追踪。 */
 import { useEffect, useMemo } from "react";
 import {
@@ -8,7 +7,7 @@ import {
   resolveModelProviderFamilyIdByProviderId,
   TID_SIDEBAR_CODING_PLAN_USAGE_BUTTON,
 } from "@zcode/shared";
-import { BarChart3Icon, RocketIcon } from "lucide-react";
+import { BarChart3Icon } from "lucide-react";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu.js";
 import {
   resolveCodingPlanUsageRemainingState,
@@ -23,16 +22,6 @@ import {
   resolveEntitledAccountProviderAccessFingerprint,
 } from "@/lib/accountProviderAccess.js";
 import { buildUsageEntitlementCacheKey } from "@/lib/usageEntitlementCache.js";
-import {
-  isMaxCodingPlanSnapshot,
-  resolveSidebarCodingPlanUpgradeFallbackProviderId,
-} from "@/lib/sidebarCodingPlanUpgrade.js";
-import {
-  createCodingPlanFunnelContext,
-  resolveCodingPlanEntryPlanState,
-  type CodingPlanFunnelContext,
-} from "@/lib/codingPlanFunnelTelemetry.js";
-import { type SidebarUsageCodingPlanProviderId } from "@/lib/sidebarUsageCodingPlanProviderPreference.js";
 import { useEnterpriseCodingPlanProducts } from "@/settings/model-provider-section/useEnterpriseCodingPlanProducts.js";
 import {
   buildCodingPlanUsageSources,
@@ -51,21 +40,14 @@ export {
   resolveSidebarFooterProfilePlanBadge,
 } from "@/WorkspaceSidebarFooterPlanBadgeHelpers.js";
 
-const TID_SIDEBAR_CODING_PLAN_UPGRADE_BUTTON = "sidebar-coding-plan-upgrade-button";
-
 export function WorkspaceSidebarFooterUsageSummary({
   enabled,
   onUsageClick,
-  onUpgradeClick,
   workspaceIdentity,
   workspacePath,
 }: {
   enabled: boolean;
   onUsageClick?: () => void;
-  onUpgradeClick?: (
-    providerId: SidebarUsageCodingPlanProviderId,
-    funnelContext: CodingPlanFunnelContext,
-  ) => void;
   workspaceIdentity?: string;
   workspacePath?: string;
 }) {
@@ -74,13 +56,7 @@ export function WorkspaceSidebarFooterUsageSummary({
     workspaceIdentity,
     workspacePath,
   });
-  return (
-    <WorkspaceSidebarFooterUsageSummaryContent
-      state={state}
-      onUsageClick={onUsageClick}
-      onUpgradeClick={onUpgradeClick}
-    />
-  );
+  return <WorkspaceSidebarFooterUsageSummaryContent state={state} onUsageClick={onUsageClick} />;
 }
 
 export function useWorkspaceSidebarFooterUsageSummaryState({
@@ -389,16 +365,8 @@ export function useWorkspaceSidebarFooterUsageSummaryState({
     selectedProviderId,
   });
   const visibleUsageState = usageState?.hasAnyActiveCodingPlan ? usageState : null;
-  const selectedUpgradeProviderId: SidebarUsageCodingPlanProviderId | undefined =
-    selectedProviderId === BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan ||
-    selectedProviderId === BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan
-      ? selectedProviderId
-      : undefined;
-  const upgradeTargetProviderId =
-    selectedUpgradeProviderId ??
-    currentUsageSource?.providerId ??
-    availableCodingPlanProviders[0]?.providerId ??
-    resolveSidebarCodingPlanUpgradeFallbackProviderId(providerFamilyDomain);
+  // 本地定制：菜单里的「升级」入口已移除（见 docs/upstream-merge-notes.md 2.3.8），
+  // 原先为它计算的 upgradeTargetProviderId / selectedUpgradeProviderId 随之删除。
   return {
     audience: currentUsageSource?.audience,
     availableCodingPlanProviders,
@@ -406,7 +374,6 @@ export function useWorkspaceSidebarFooterUsageSummaryState({
     providerEntitlements,
     profilePlanBadge,
     selectedProviderId,
-    upgradeTargetProviderId,
     usageState: visibleUsageState,
   };
 }
@@ -416,26 +383,18 @@ type WorkspaceSidebarFooterUsageSummaryState = ReturnType<
 >;
 
 export function WorkspaceSidebarFooterUsageSummaryContent({
-  state,
   onUsageClick,
-  onUpgradeClick,
 }: {
+  /**
+   * 本地定制：升级入口移除后本组件不再读取 state（只剩「使用统计」一项）。
+   * 仍然保留这个 prop 声明：清掉它会牵动调用方（`WorkspaceSidebarFooter` 与同文件里
+   * 那个已无人引用的包装组件）以及 footer 的 state 计算，收益不抵改动面。
+   * 见 docs/upstream-merge-notes.md 2.3.8。
+   */
   state: WorkspaceSidebarFooterUsageSummaryState;
   onUsageClick?: () => void;
-  onUpgradeClick?: (
-    providerId: SidebarUsageCodingPlanProviderId,
-    funnelContext: CodingPlanFunnelContext,
-  ) => void;
 }) {
   const { intl } = useZCodeIntl();
-  const entryGate = useCodingPlanEntryGate();
-  const { providerEntitlements, upgradeTargetProviderId } = state;
-  const upgradeProviderSnapshot =
-    providerEntitlements.find((item) => item.providerId === upgradeTargetProviderId)?.snapshot ??
-    null;
-  const upgradeActionLabelId = isMaxCodingPlanSnapshot(upgradeProviderSnapshot)
-    ? "sidebar.usage.plan.renew"
-    : "sidebar.usage.plan.upgrade";
 
   return (
     <>
@@ -450,33 +409,8 @@ export function WorkspaceSidebarFooterUsageSummaryContent({
         <BarChart3Icon className="size-4" />
         {intl.formatMessage({ id: "sidebar.usage.plan.openStats" })}
       </DropdownMenuItem>
-      {/* 产品要求：升级入口始终显示；未解析出当前套餐时由当前 provider family 决定品牌。 */}
-      <DropdownMenuItem
-        data-testid={TID_SIDEBAR_CODING_PLAN_UPGRADE_BUTTON}
-        disabled={entryGate.status === "loading"}
-        aria-busy={entryGate.status === "loading"}
-        onSelect={() => {
-          if (entryGate.status !== "ready") {
-            entryGate.retry?.();
-            return;
-          }
-          onUpgradeClick?.(
-            upgradeTargetProviderId,
-            createCodingPlanFunnelContext({
-              providerId: upgradeTargetProviderId,
-              upgradeSource: "profile_menu",
-              eventRegion: "app.profile",
-              eventText: intl.formatMessage({ id: upgradeActionLabelId }),
-              entryPlanState: resolveCodingPlanEntryPlanState({
-                snapshot: upgradeProviderSnapshot,
-              }),
-            }),
-          );
-        }}
-      >
-        <RocketIcon className="size-4" />
-        {entryGate.label ?? intl.formatMessage({ id: upgradeActionLabelId })}
-      </DropdownMenuItem>
+      {/* 本地定制：上游在这里的「升级 / 续费」入口已移除（见 docs/upstream-merge-notes.md 2.3.8）。
+          它原先始终显示，并带 Coding Plan entry gate 与 funnel 埋点；相关依赖已一并清理。 */}
     </>
   );
 }
