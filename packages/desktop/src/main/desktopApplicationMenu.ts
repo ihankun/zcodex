@@ -272,11 +272,9 @@ function buildApplicationMenuTemplate(options: {
               { type: "separator" as const },
             ]
           : []),
-        {
-          label: getLabel(desktopMenuMessageIds.helpWhatsNew),
-          click: () => void options.executeDesktopCommand(DesktopCommandIds.OpenChangelog),
-        },
-        { type: "separator" as const },
+        // 本地定制：上游在这里的「更新日志」（helpWhatsNew → OpenChangelog）已移除；
+        // 连同它后面的分隔线一起删——在 macOS 上它原本是菜单第一项，留着会让菜单以分隔线开头。
+        // 非 macOS 分支（About / 检查更新）自带的分隔线仍然保留。
         ...(isLocalDevelopmentRuntime && stdioTapState.visible
           ? [
               {
@@ -333,10 +331,8 @@ function buildApplicationMenuTemplate(options: {
           click: () => void options.executeDesktopCommand(DesktopCommandIds.OpenResourceManager),
         },
         { type: "separator" as const },
-        {
-          label: getLabel(desktopMenuMessageIds.helpFeedback),
-          click: () => void options.executeDesktopCommand(DesktopCommandIds.OpenFeedback),
-        },
+        // 本地定制：上游在这里的「问题上报」（helpFeedback → OpenFeedback）已移除；
+        // 它后面的「导出日志」保留，所以这处前置分隔线继续生效。
         {
           label: getLabel(desktopMenuMessageIds.helpExportLogs),
           click: () => void options.executeDesktopCommand(DesktopCommandIds.ExportLogs),
