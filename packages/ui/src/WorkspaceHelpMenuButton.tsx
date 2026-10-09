@@ -3,32 +3,20 @@ import {
   TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER,
   TID_WORKSPACE_HELP_MENU_TRIGGER,
 } from "@zcode/shared";
-import {
-  ActivityIcon,
-  BookOpenIcon,
-  CircleHelpIcon,
-  LightbulbIcon,
-  InfoIcon,
-  MessageSquareIcon,
-  UsersIcon,
-  RefreshCwIcon,
-} from "lucide-react";
+import { ActivityIcon, CircleHelpIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge.js";
 import { Button } from "@/components/ui/button.js";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.js";
 import { cn } from "@/components/lib/utils.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
-import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import { useDesktopUpdateMenu } from "@/hooks/useDesktopUpdateMenu.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
-import { createHelpMenuActionHandlers } from "@/lib/helpMenuActions.js";
 
 export function WorkspaceHelpMenuButton({
   className,
@@ -44,17 +32,7 @@ export function WorkspaceHelpMenuButton({
   const { intl } = useZCodeIntl();
   const platform = usePlatform();
   const updateMenu = useDesktopUpdateMenu(isDesktop);
-  const openFeedbackSubmit = useFeedbackStore((state) => state.openSubmit);
-  const openFeatureRequest = useFeedbackStore((state) => state.openFeatureRequest);
   const helpMenuLabel = intl.formatMessage({ id: "workspaceHeader.help.menu" });
-  const helpMenuActions = createHelpMenuActionHandlers({
-    platform,
-    intl,
-    openSubmit: openFeedbackSubmit,
-  });
-  const handleOpenCommunity = () => {
-    void platform.openCommunity();
-  };
   const handleOpenResourceManager = () => {
     void platform.executeDesktopCommand(DesktopCommandIds.OpenResourceManager);
   };
@@ -62,6 +40,15 @@ export function WorkspaceHelpMenuButton({
   const handleShowAbout = () => {
     void platform.executeDesktopCommand(DesktopCommandIds.ShowAbout);
   };
+
+  // 本地定制：产品文档 / 用户社群 / 问题上报 / 给产品提需求 四项已从菜单移除
+  // （它们都指向上游的产品服务入口）。剩下的三项都是桌面专属——Web 没有资源管理器、
+  // 桌面更新与关于面板——所以 Web 上不再渲染这个按钮，否则会留下一个点开是空的菜单。
+  // 相应的 `lib/helpMenuActions.ts` 因此不再有调用方，按本 fork 的合并策略保留为不可达代码
+  // （与 forceUpdateGuard 同理：留着与上游逐字节一致，删除会让上游每次改动都产生 delete/modify 冲突）。
+  if (!isDesktop) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
@@ -88,63 +75,36 @@ export function WorkspaceHelpMenuButton({
         align="end"
         className="min-w-0 w-max [&_[data-slot=dropdown-menu-item]]:pr-6"
       >
-        <DropdownMenuItem onSelect={helpMenuActions.openProductDocs}>
-          <BookOpenIcon className="size-4" />
-          {intl.formatMessage({ id: "workspaceHeader.help.docs" })}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={handleOpenCommunity}>
-          <UsersIcon className="size-4" />
-          {intl.formatMessage({ id: "workspaceHeader.help.community" })}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={helpMenuActions.openIssueReport}>
-          <MessageSquareIcon className="size-4" />
-          {intl.formatMessage({ id: "workspaceHeader.help.issueReport" })}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={openFeatureRequest}>
-          <LightbulbIcon className="size-4" />
-          {intl.formatMessage({ id: "workspaceHeader.help.productRequest" })}
-        </DropdownMenuItem>
         {/* Windows/Linux 没有原生菜单栏，自绘标题栏箭头菜单也已下线，
-            资源管理器只能从这里进；Web 端没有该窗口，不渲染。 */}
-        {isDesktop ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              data-testid={TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER}
-              onSelect={handleOpenResourceManager}
-            >
-              <ActivityIcon className="size-4" />
-              {intl.formatMessage({ id: "titleBar.menu.help.resourceManager" })}
-            </DropdownMenuItem>
-            {updateMenu.visible ? (
-              <DropdownMenuItem
-                disabled={updateMenu.disabled}
-                onSelect={updateMenu.checkForUpdates}
-              >
-                <RefreshCwIcon className="size-4" />
-                {updateMenu.labelId === "desktopMenu.help.restartToUpdate" ? (
-                  <>
-                    <span className="whitespace-nowrap">
-                      {intl.formatMessage({ id: "desktopMenu.help.restartUpdateAction" })}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className="h-4 px-1.5 py-0 bg-success/10 text-success"
-                    >
-                      {updateMenu.labelValues?.version}
-                    </Badge>
-                  </>
-                ) : (
-                  intl.formatMessage({ id: updateMenu.labelId }, updateMenu.labelValues)
-                )}
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem onSelect={handleShowAbout}>
-              <InfoIcon className="size-4" />
-              {intl.formatMessage({ id: "titleBar.menu.help.about" })}
-            </DropdownMenuItem>
-          </>
+            资源管理器只能从这里进。 */}
+        <DropdownMenuItem
+          data-testid={TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER}
+          onSelect={handleOpenResourceManager}
+        >
+          <ActivityIcon className="size-4" />
+          {intl.formatMessage({ id: "titleBar.menu.help.resourceManager" })}
+        </DropdownMenuItem>
+        {updateMenu.visible ? (
+          <DropdownMenuItem disabled={updateMenu.disabled} onSelect={updateMenu.checkForUpdates}>
+            <RefreshCwIcon className="size-4" />
+            {updateMenu.labelId === "desktopMenu.help.restartToUpdate" ? (
+              <>
+                <span className="whitespace-nowrap">
+                  {intl.formatMessage({ id: "desktopMenu.help.restartUpdateAction" })}
+                </span>
+                <Badge variant="secondary" className="h-4 px-1.5 py-0 bg-success/10 text-success">
+                  {updateMenu.labelValues?.version}
+                </Badge>
+              </>
+            ) : (
+              intl.formatMessage({ id: updateMenu.labelId }, updateMenu.labelValues)
+            )}
+          </DropdownMenuItem>
         ) : null}
+        <DropdownMenuItem onSelect={handleShowAbout}>
+          <InfoIcon className="size-4" />
+          {intl.formatMessage({ id: "titleBar.menu.help.about" })}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
