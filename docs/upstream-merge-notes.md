@@ -212,6 +212,22 @@
   `resolveV4ModelTriggerLabel` 的结果，语义未变。
 - 由 `packages/ui/test/modelTriggerDisplay.test.ts` 钉住（本地定制的回归防线，合并后要跑）。
 
+#### 2.3.7 帮助菜单隐藏上游产品入口（2026-10-09）
+
+`packages/ui/src/WorkspaceHelpMenuButton.tsx` — 移除菜单里指向上游产品服务的四项：
+**产品文档 / 用户社群 / 问题上报 / 给产品提需求**；只保留「资源管理器 / 检查更新 / 关于 ZCodex」。
+顺带删掉了现在会打头的分隔线，并加了「非桌面端不渲染该按钮」的门（剩下三项全是桌面专属，
+Web 上否则会剩一个点开是空的菜单）。
+
+- `packages/ui/src/lib/helpMenuActions.ts` **保留为不可达代码**（它只服务被移除的两项）：
+  理由同第三节的 `forceUpdateGuard`——留着与上游逐字节一致，删除会让上游每次改动都产生
+  delete/modify 冲突。已知代价：`pnpm knip` 会把它列进 unused files（基线噪音）。
+- **未动的地方**（要一起隐藏得另外改）：macOS 原生 Help 菜单里仍有「问题上报」
+  （`desktopMenu.ts` 的 `helpFeedback`，与导出日志、清除所有数据同处一个菜单）；
+  命令面板（`quickpick/quickPickCommands.ts`）里也仍有这四个命令。
+- i18n 的 `workspaceHeader.help.{docs,community,issueReport,productRequest}` 文案保留，
+  它们仍是命令面板与原生菜单的文案来源。
+
 ### 2.4 启动与桌面行为
 
 #### 2.4.1 启动强制升级 gate 已禁用
@@ -487,6 +503,41 @@ runtime is not running")`、`packages/ui/src/lib/zcodeUiError.ts` 的
   `~/Library/Services` 留下旧副本，Finder 里就出现两个同名项，得再写清理逻辑。
 - **目前没有开关可以关掉它**：`installFinderOpenFolderWorkflow` 每次启动都执行，删掉目录会被重建。
   要能关就得加设置项（未实现）。
+
+### 2.9 供应商余量查询（DeepSeek / OpenCode Go，2026-10-09）
+
+fork 新增的功能，上游没有：在【模型设置 → 供应商卡片】与【输入框上下文用量面板】两处显示
+DeepSeek 金额余额（含赠金/充值分项）与 OpenCode Go 的 5h / 1w / 1m 用量。
+完整方案与验收场景见 `docs/specs/provider-balance-query.md`。
+
+**新增文件**（上游不会有；冲突时保留本地）：
+`packages/shared/src/provider-balance.ts`（支持余量的 provider 名单，services 与 UI 共读这一份）、
+`packages/services/src/usage-stats/providers/{providerBalanceSupport,deepseekBalanceProvider,openCodeGoUsageProvider,providerBalanceRegistry}.ts`、
+`packages/ui/src/hooks/useProviderBalance.ts`、`packages/ui/src/lib/providerBalancePresentation.ts`、
+`packages/ui/src/provider-balance/ProviderBalanceRows.tsx`、
+`packages/ui/src/settings/model-provider-section/ProviderBalanceSection.tsx`、
+`packages/ui/src/chat-input-toolbar/ProviderBalancePanel.tsx`。
+
+**改到的上游文件**（合并时要保住这些挂钩，别整段采用上游版本）：
+
+- `packages/shared/src/usage-quota.ts`、`usage-stats.ts`：新增 `PROVIDER_USAGE_WINDOW_LIMIT_TYPE`、
+  `ProviderUsageWindowPeriod`、`UsageProviderMoneyBalance`，以及 `UsageEntitlementSnapshot.balance`。
+- `packages/services/src/usage-stats/usageStatsService.ts`：`getEntitlementSnapshot` 前置一条
+  「名单内 provider → 第三方派发表」的分支；新增可选依赖 `providerSettingsService`（读该 provider
+  配置里的 `access.apiKey`，且只认 `access.type === "api-key"`）。
+- `packages/services/src/node.ts`、`packages/desktop/src/host/remoteWorkspaceServiceCollection.ts`：
+  装配处多传 `providerSettingsService`（缺省时行为与上游一致）。
+- `packages/ui/src/v4/composer/V4ComposerToolbar.tsx`、`chat-input-toolbar/contextUsage.tsx`：
+  新增 `providerBalance` 段，与 GLM 的 Start Plan / Coding Plan 段并列且互斥；
+  hover 刷新复用既有 `onAccess` 链路（60s access 窗口 + in-flight 合并）。
+- `packages/ui/src/settings/model-provider-section/Detail.tsx`：通用 provider 分支多渲染一个余量区块。
+- `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`：`settings.modelProvider.providerBalance.*` 13 条
+  与 `planCard.usage.month`。
+- 单测：`packages/services/test/providerBalanceNormalize.test.ts`、
+  `packages/ui/test/providerBalancePresentation.test.ts`（合并上游后要一起跑）。
+
+**刻意不动**：`BigModelUsageQuotaProvider` 与 GLM 的 coding-plan / start-plan 链路一行未改；
+OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验证，宁可不显示余量段。
 
 ## 三、踩坑记录（不要再重复）
 
