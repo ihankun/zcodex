@@ -3,7 +3,11 @@ import { z } from "zod";
 
 // 额度类型拆在 usage-quota.ts，见该文件头部说明；这里 re-export 保持既有 import 路径不变。
 export * from "./usage-quota.js";
-import type { UsageMcpQuotaSnapshot, UsageQuotaSnapshot } from "./usage-quota.js";
+import type {
+  UsageMcpQuotaSnapshot,
+  UsageProviderMoneyBalance,
+  UsageQuotaSnapshot,
+} from "./usage-quota.js";
 import type { ZCodeAccountAccess, ZCodeProviderAccountAccess } from "./zcode-protocol/index.js";
 
 export const ESTIMATED_TOKEN_CHAR_DIVISOR = 3;
@@ -84,6 +88,12 @@ export interface UsageEntitlementSnapshot {
    * 拉取失败、未开通 Coding Plan、或该额度不属于本次查询的连接时一律为 null（可选数据面）。
    */
   mcpQuota?: UsageMcpQuotaSnapshot | null;
+  /**
+   * 金额类余额（DeepSeek 等按充值金额计费的第三方 provider）。
+   * 与 quota 同一份快照下发，继承 entitlement 已有的缓存 / in-flight 合并 / TTL 策略；
+   * 非金额型 provider（GLM、OpenCode 的窗口额度）一律为 null 或省略。
+   */
+  balance?: UsageProviderMoneyBalance | null;
 }
 
 export interface UsageEntitlementContext {

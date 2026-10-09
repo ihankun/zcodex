@@ -48,6 +48,7 @@ import {
   hasChatStartPlanBalance,
   type ChatStartPlanBalanceConfig,
 } from "@/chat-input-toolbar/StartPlanContextBalance.js";
+import type { ChatProviderBalanceConfig } from "@/chat-input-toolbar/ProviderBalancePanel.js";
 import { ThoughtLevelCycleControl } from "@/chat-input-toolbar/ThoughtLevelCycleControl.js";
 import { getNextThoughtLevelValue } from "@/chat-input-toolbar/thoughtLevelOptions.js";
 import type { V4ComposerConfigPicker } from "@/v4/composer/configPickerState.js";
@@ -70,6 +71,7 @@ import {
   useUsageEntitlement,
   type UsageEntitlementRefreshOptions,
 } from "@/hooks/useUsageEntitlement.js";
+import { useProviderBalance } from "@/hooks/useProviderBalance.js";
 import { useToolbarConfigOptions } from "@/hooks/useZCodeConfig.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import {
@@ -532,6 +534,38 @@ function V4ComposerModelControlsImpl({
   const contextStartPlanBalance = hasChatStartPlanBalance(contextStartPlanBalanceConfig)
     ? contextStartPlanBalanceConfig
     : undefined;
+
+  // 第三方 provider（DeepSeek / OpenCode Go）的余量：与 GLM 套餐互斥，按当前模型所属 provider 解析。
+  // refreshOnMount 让浮层打开时就有数据；hover 走 onAccess 的 60s access 窗口，不会因反复 hover 放大请求。
+  const providerBalanceEntitlement = useProviderBalance({
+    providerId: effectiveConfig?.provider,
+    refreshOnMount: true,
+  });
+  const contextProviderBalance = useMemo<ChatProviderBalanceConfig | undefined>(() => {
+    const providerId = effectiveConfig?.provider?.trim();
+    if (!providerBalanceEntitlement.supported || !providerId) {
+      return undefined;
+    }
+    return {
+      providerName:
+        modelSelectionView?.providers.find((candidate) => candidate.providerId === providerId)
+          ?.providerName ?? providerId,
+      loading: providerBalanceEntitlement.loading,
+      // 归属校验：切换 provider 后新 provider 的查询还没回来时，不能把上一家的余量画上去。
+      snapshot:
+        providerBalanceEntitlement.snapshot?.provider?.id === providerId
+          ? providerBalanceEntitlement.snapshot
+          : null,
+      onAccess: () => providerBalanceEntitlement.refresh({ silent: true, reason: "access" }),
+    };
+  }, [
+    effectiveConfig?.provider,
+    modelSelectionView,
+    providerBalanceEntitlement.loading,
+    providerBalanceEntitlement.refresh,
+    providerBalanceEntitlement.snapshot,
+    providerBalanceEntitlement.supported,
+  ]);
 
   // 原 hook 不传 family，默认只拉 bigmodel 企业 pricing，
   // zai team plan 拿不到订阅产品，模型选择器里的 team 模型组建不出来。
@@ -1014,6 +1048,7 @@ function V4ComposerModelControlsImpl({
         codingPlanUsageRemaining={codingPlanUsageRemaining}
         taskUsage={taskUsage}
         startPlanBalance={contextStartPlanBalance}
+        providerBalance={contextProviderBalance}
         selectedProvider={displayProvider}
         intl={intl}
         locale={locale}

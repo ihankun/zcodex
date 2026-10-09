@@ -2472,6 +2472,8 @@ export function createLocalServices(options: {
         credentialService,
         zcodeAgentService,
         officialMcpCredentialSource,
+        // 第三方 provider（DeepSeek / OpenCode Go）的余量查询要读该 provider 配置里的 API Key。
+        providerSettingsService: providerRuntime.providerSettings,
       }),
     )
     .register(ICodingPlanSubscriptionService, codingPlanSubscriptionService)

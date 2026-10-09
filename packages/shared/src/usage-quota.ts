@@ -72,3 +72,34 @@ export interface UsageMcpQuotaSnapshot {
    */
   aggregate: UsageQuotaLimit;
 }
+
+/**
+ * 第三方 provider（DeepSeek / OpenCode Go）按时间窗口下发的额度类型。
+ *
+ * 与 MCP 同样的理由不复用 TOKENS_LIMIT / TIME_LIMIT：那是 GLM 的额度分类，混用会被
+ * `isSameLimitCategory` 与 `findCodingPlanQuotaLimit` 误命中。
+ */
+export const PROVIDER_USAGE_WINDOW_LIMIT_TYPE = "PROVIDER_USAGE_WINDOW_LIMIT" as const;
+
+/** 窗口身份。展示端据此映射到「5h / 1w / 1m」文案，服务端返回的字段名见各 provider 实现。 */
+export type ProviderUsageWindowPeriod = "rolling" | "weekly" | "monthly";
+
+/**
+ * 金额类余额（DeepSeek 等按充值金额计费的 provider）。
+ *
+ * 不塞进 `remaining` / `number` / `unit`：那套是 token / 次数语义，金额的**币种**与
+ * 「赠金 / 充值」构成在里面无处安放。金额一律保留服务端原样字符串，展示端不做数值运算，
+ * 避免浮点误差与币种混淆。
+ */
+export interface UsageProviderMoneyBalance {
+  /** 服务端返回的币种代码，如 `CNY` / `USD`。 */
+  currency: string;
+  /** 可用总额（服务端原样字符串）。 */
+  total: string;
+  /** 赠金部分，服务端未提供时为 undefined。 */
+  granted?: string;
+  /** 充值部分，服务端未提供时为 undefined。 */
+  toppedUp?: string;
+  /** 服务端 `is_available`：false 表示账户当前不可用（余额仍可能返回）。 */
+  isAvailable: boolean;
+}

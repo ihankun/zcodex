@@ -356,6 +356,7 @@ export function createRemoteWorkspaceServiceCollection(params: {
         accountRequestAuthService: localAccountRequestAuthService,
         credentialService: localCredentialService,
         zcodeAgentService: params.connectionServices.zcodeAgentService,
+        providerSettingsService: params.connectionServices.providerSettingsService,
       }),
     )
     .register(ICodingPlanSubscriptionService, localCodingPlanSubscriptionService)

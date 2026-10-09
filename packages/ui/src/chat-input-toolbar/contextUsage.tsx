@@ -47,6 +47,11 @@ import {
 } from "@/chat-input-toolbar/CodingPlanContextUsage.js";
 import { resolveChatCodingPlanResetOpportunityBadge } from "@/chat-input-toolbar/codingPlanResetOpportunityBadge.js";
 import {
+  ChatProviderBalancePanel,
+  hasChatProviderBalance,
+  type ChatProviderBalanceConfig,
+} from "@/chat-input-toolbar/ProviderBalancePanel.js";
+import {
   ChatStartPlanBalancePanel,
   hasChatStartPlanBalance,
   type ChatStartPlanBalanceConfig,
@@ -235,6 +240,7 @@ function resolveAutomaticCompletedAt(entry: CodingPlanQuotaResetUiEntry | null):
 export function ChatContextUsage({
   codingPlanUsageRemaining,
   startPlanBalance,
+  providerBalance,
   taskUsage,
   selectedProvider: _selectedProvider,
   intl,
@@ -242,6 +248,8 @@ export function ChatContextUsage({
 }: {
   codingPlanUsageRemaining?: ChatCodingPlanUsageRemainingConfig;
   startPlanBalance?: ChatStartPlanBalanceConfig;
+  /** 第三方 provider（DeepSeek / OpenCode Go）的余量段；与 GLM 的两段并列、互斥。 */
+  providerBalance?: ChatProviderBalanceConfig;
   taskUsage: {
     used: number;
     size: number;
@@ -273,8 +281,12 @@ export function ChatContextUsage({
       setContextOpen(open);
       // hover 刷新入口不能只认 Coding Plan 的 onAccess：Start Plan（今日余额）与
       // Coding Plan 连接方式互斥，start plan 用户 hover 时整条刷新链路都不触发，余额只能被动等
-      // 设置页/侧栏刷新。改为两段配置任一提供 onAccess 即发起本次静默 access 刷新（互斥下实际只有一个存在）。
-      const accessRefresh = codingPlanUsageRemaining?.onAccess ?? startPlanBalance?.onAccess;
+      // 设置页/侧栏刷新。改为两段配置任一提供 onAccess 即发起本次静默 access 刷新（互斥下实际只有一个存在）；
+      // 第三方 provider 的余量段同理（它只在非 GLM provider 下出现，与上面两段天然互斥）。
+      const accessRefresh =
+        codingPlanUsageRemaining?.onAccess ??
+        startPlanBalance?.onAccess ??
+        providerBalance?.onAccess;
       if (!open || !accessRefresh) {
         return;
       }
@@ -289,7 +301,7 @@ export function ChatContextUsage({
         }
       });
     },
-    [codingPlanUsageRemaining?.onAccess, startPlanBalance?.onAccess],
+    [codingPlanUsageRemaining?.onAccess, providerBalance?.onAccess, startPlanBalance?.onAccess],
   );
   const handleQuotaResetDialogOpenChange = useCallback((open: boolean) => {
     quotaResetDialogOpenRef.current = open;
@@ -1003,6 +1015,19 @@ export function ChatContextUsage({
               locale={locale}
               separated={Boolean(
                 (renderableTaskUsage && compactTokenUsageLabel) || hasCodingPlanUsageRemaining,
+              )}
+            />
+          ) : null}
+          {providerBalance && hasChatProviderBalance(providerBalance) ? (
+            <ChatProviderBalancePanel
+              config={providerBalance}
+              intl={intl}
+              locale={locale}
+              // 与 GLM 两段互斥（第三方 provider 不是 GLM 套餐），所以只要上面任一存在就要加分隔线。
+              separated={Boolean(
+                (renderableTaskUsage && compactTokenUsageLabel) ||
+                hasCodingPlanUsageRemaining ||
+                hasStartPlanBalance,
               )}
             />
           ) : null}

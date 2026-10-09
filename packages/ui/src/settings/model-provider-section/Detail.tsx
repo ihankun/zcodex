@@ -32,6 +32,7 @@ import {
   PresetProviderPlaceholderCard,
   CodingPlanStatusPanel,
 } from "./StatusCards.js";
+import { ProviderBalanceSection } from "./ProviderBalanceSection.js";
 import {
   resolveCodingPlanUpgradeProductsProviderId,
   type CodingPlanLoginOptions,
@@ -848,29 +849,36 @@ export function ModelProviderSectionDetail({
     ? getProviderFormApiKeyManagementUrl(customProvider)
     : undefined;
   return (
-    // 仅展示预设模板声明的入口，不根据地址猜测自定义 Provider 的 Key 控制台。
-    <InlineEditableProviderCard
-      provider={customProvider}
-      onSave={onSave}
-      {...modelEditingProps}
-      onDelete={() => onDelete(customProvider)}
-      onReorderModelIds={
-        onReorderProviderModels
-          ? (modelIds) => onReorderProviderModels(customProvider.providerId, modelIds)
-          : undefined
-      }
-      onTestModel={onTestModel}
-      presetApiKeyUrl={customApiKeyUrl}
-      readOnlyEndpoints={false}
-      nameEditable
-      onOpenPresetApiKey={
-        customApiKeyUrl
-          ? () => {
-              onOpenApiKeyUrl(customApiKeyUrl);
-            }
-          : undefined
-      }
-    />
+    <div className="space-y-3">
+      {/* 仅展示预设模板声明的入口，不根据地址猜测自定义 Provider 的 Key 控制台。 */}
+      <InlineEditableProviderCard
+        provider={customProvider}
+        onSave={onSave}
+        {...modelEditingProps}
+        onDelete={() => onDelete(customProvider)}
+        onReorderModelIds={
+          onReorderProviderModels
+            ? (modelIds) => onReorderProviderModels(customProvider.providerId, modelIds)
+            : undefined
+        }
+        onTestModel={onTestModel}
+        presetApiKeyUrl={customApiKeyUrl}
+        readOnlyEndpoints={false}
+        nameEditable
+        onOpenPresetApiKey={
+          customApiKeyUrl
+            ? () => {
+                onOpenApiKeyUrl(customApiKeyUrl);
+              }
+            : undefined
+        }
+      />
+      {/* 余量区块自身按 provider 名单判断是否渲染；点击「查询」才发请求。 */}
+      <ProviderBalanceSection
+        providerId={customProvider.providerId}
+        providerName={customProvider.providerName}
+      />
+    </div>
   );
 }
 
