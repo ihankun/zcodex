@@ -156,27 +156,29 @@ pnpm bundle:desktop -- --help
 
 默认目标为 macOS arm64，默认输出目录为 `packages/desktop/dist/`。`--os` 支持 `mac`、`win`、`linux`，`--arch` 支持 `x64`、`arm64`；实际打包与签名需要目标平台对应的工具和配置。
 
-安装：双击打开产物 DMG，将 ZCode 拖入"应用程序"。本地构建未签名，首次打开若被 macOS 拦截，执行：
+安装：双击打开产物 DMG，将 ZCodex 拖入"应用程序"。本地构建未签名，首次打开若被 macOS 拦截，执行：
 
 ```bash
-sudo xattr -rd com.apple.quarantine /Applications/ZCode.app
+sudo xattr -rd com.apple.quarantine /Applications/ZCodex.app
 ```
 
 #### 内置插件载荷
 
-官方安装包的 `Contents/Resources/glm/packages/` 里有 14 个内置插件包。本仓库带其中
-`browser-use-plugin`、`node-repl-host`（以及技能包 `bundled-skills`）的源码；其余 12 个
-（pdf、documents、spreadsheets、presentations、image-search、android-emulator、ios-simulator、
-plugin-creator、skill-creator、restore-legacy-sessions、zcode-guide、zcode-cua）是官方预编译资产，
-已作为载荷入库在 `packages/desktop/vendor/official-plugins/`。暂存与打包时会自动带上，
-因此在任意平台（含 Windows）干净检出后打包都会包含这批插件。
+官方安装包的 `Contents/Resources/glm/packages/` 里有十几个内置插件包，**现在它们的源码都随本仓库
+发布**（`apps/zcode-cli/packages/*-plugin/`，含 pdf、documents、spreadsheets、presentations、
+image-search、android-emulator、ios-simulator、plugin-creator、skill-creator、
+restore-legacy-sessions、zcode-guide、zcode-cua、visualize、superpowers 等）。打包时由
+`packages/desktop/scripts/prepare-agent-node-bundle.mjs` 按源码 stage 到
+`bundled-agents/<平台>/glm/packages/`，启动 seed 也从源码树读取，因此在任意平台（含 Windows）
+干净检出后打包都会包含这批插件。
 
-这批载荷是官方预编译二进制，**不是开源代码**：自己本机使用没问题，对外分发需自行确认许可。
-入库范围、升级上游后如何重新对齐载荷、来源优先级与已知版本差异见
-[packages/desktop/vendor/official-plugins/README.md](packages/desktop/vendor/official-plugins/README.md)。
+历史上这些插件只有官方预编译资产，本仓库曾把 12 个载荷入库到
+`packages/desktop/vendor/official-plugins/` 并配一套暂存逻辑；上游 v3.15.1 开源全部插件源码后，
+那套机制已整体删除，仓库不再携带预编译载荷（连带也不再涉及第三方二进制资产的许可问题）。
 
-载荷版本要与源码里的内置插件定义表一致；不一致的插件会被跳过（日志里带缺失文件清单），
-其余插件不受影响。
+内置插件的 `version` 与 `requiredSeedPaths` 由
+`apps/zcode-cli/packages/bootstrap/src/app/official-plugin-definitions.ts` 定义，必须与插件源码一致；
+不一致的插件会被跳过（日志里带缺失文件清单），其余插件不受影响。
 
 ### 桌面版自动更新发布
 

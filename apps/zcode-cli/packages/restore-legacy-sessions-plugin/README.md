@@ -25,8 +25,8 @@ Changes apply to new sessions. After enabling, use:
 ## Data Boundaries
 
 - Default source: `~/.zcode/v2/sessions`
-- Task index destination: `~/.zcode/v2/tasks-index.sqlite`
-- CLI session DB destination: `~/.zcode/cli/db/db.sqlite`
+- Task index destination: `~/.zcodex/v2/tasks-index.sqlite`
+- CLI session DB destination: `~/.zcodex/cli/db/db.sqlite`
 
 The restore scripts create timestamped DB backups before writing. Restored ACP-era conversations are persisted as normal `glm` ZCode Agent history and do not write `migration_source`.
 

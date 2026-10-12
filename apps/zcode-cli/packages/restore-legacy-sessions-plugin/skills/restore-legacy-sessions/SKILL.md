@@ -12,8 +12,8 @@ Use this skill to guide old ACP-era ZCode session restoration. The first job is 
 ## Stores
 
 - Legacy snapshots: `~/.zcode/v2/sessions/{workspaceHash}/{legacyTaskId}.json`
-- Task index: `~/.zcode/v2/tasks-index.sqlite`
-- New ZCode session DB: `~/.zcode/cli/db/db.sqlite`
+- Task index: `~/.zcodex/v2/tasks-index.sqlite`
+- New ZCode session DB: `~/.zcodex/cli/db/db.sqlite`
 
 Use `restoredTaskId = meta.acpSessionId || meta.taskId`. The legacy snapshot filename and `meta.taskId` are historical IDs; the app task list often uses `meta.acpSessionId` as the real task/session ID.
 
@@ -70,7 +70,7 @@ node scripts/restore-conversation.mjs --snapshot ~/.zcode/v2/sessions/<workspace
 ## Restore States
 
 - `ready`: CLI DB and task-index both already contain the restored task id.
-- `needs-cli-db`: task-index exists, but `~/.zcode/cli/db/db.sqlite` has no session row; rebuild the real session from the legacy snapshot.
+- `needs-cli-db`: task-index exists, but `~/.zcodex/cli/db/db.sqlite` has no session row; rebuild the real session from the legacy snapshot.
 - `needs-task-index`: CLI DB exists, but task-index is missing; backfill task-index only.
 - `needs-full-import`: both stores are missing; import session history and then index it.
 
