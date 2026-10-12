@@ -2,6 +2,7 @@ import {
   PROVIDER_USAGE_WINDOW_LIMIT_TYPE,
   type ProviderUsageWindowPeriod,
   type UsageEntitlementSnapshot,
+  type UsageProviderMoneyBalance,
   type UsageQuotaLimit,
 } from "@zcode/shared";
 
@@ -73,4 +74,68 @@ export function resolveProviderBalanceUnavailableMessageKey(reason: string | und
     default:
       return "settings.modelProvider.providerBalance.unavailable.generic";
   }
+}
+
+/**
+ * 金额是否为 0。
+ *
+ * 按**字符串**判断而不是 `Number.parseFloat`：金额一律不做数值运算（见 `UsageProviderMoneyBalance`
+ * 的注释），而且服务端给的是十进制字符串，转浮点再比 0 会引入不必要的误差面。
+ * 判据：去掉小数点和千分位后，剩下的字符全是 `0`。空串或缺失视为 0（没有该分项）。
+ */
+export function isZeroProviderBalanceAmount(amount: string | null | undefined): boolean {
+  const digits = amount?.replace(/[.,\s]/gu, "") ?? "";
+  return digits.length === 0 || /^0+$/u.test(digits);
+}
+
+export interface ProviderBalanceMoneyRow {
+  key: "total" | "granted" | "toppedUp";
+  labelKey: string;
+  value: string;
+  /** 主行（余额）用更强排版，分项用次要样式。 */
+  emphasis?: boolean;
+}
+
+/**
+ * 金额余额要显示的行。
+ *
+ * 赠金为 0（或服务端没给赠金）时只显示「余额」一行：此时「赠金 / 充值」两个分项没有区分意义，
+ * 两行 `0.00` 只会让读数变啰嗦。赠金非 0 才展开分项，充值缺失时只多一行赠金。
+ */
+export function resolveProviderBalanceMoneyRows(
+  balance: UsageProviderMoneyBalance,
+): ProviderBalanceMoneyRow[] {
+  const rows: ProviderBalanceMoneyRow[] = [
+    {
+      key: "total",
+      labelKey: "settings.modelProvider.providerBalance.total",
+      value: formatProviderBalanceAmount(balance.currency, balance.total),
+      emphasis: true,
+    },
+  ];
+
+  if (isZeroProviderBalanceAmount(balance.granted)) {
+    return rows;
+  }
+
+  const granted = balance.granted;
+  if (!granted) {
+    // isZeroProviderBalanceAmount 对缺失值返回 true，这里只是让类型收窄；逻辑上不可达。
+    return rows;
+  }
+
+  rows.push({
+    key: "granted",
+    labelKey: "settings.modelProvider.providerBalance.granted",
+    value: formatProviderBalanceAmount(balance.currency, granted),
+  });
+  if (balance.toppedUp) {
+    rows.push({
+      key: "toppedUp",
+      labelKey: "settings.modelProvider.providerBalance.toppedUp",
+      value: formatProviderBalanceAmount(balance.currency, balance.toppedUp),
+    });
+  }
+
+  return rows;
 }

@@ -12,8 +12,8 @@ import {
   formatStartPlanBucketResetTime,
 } from "@/lib/codingPlanQuotaPresentation.js";
 import {
-  formatProviderBalanceAmount,
   readProviderBalanceWindowLimits,
+  resolveProviderBalanceMoneyRows,
   resolveProviderBalanceWindowLabelKey,
 } from "@/lib/providerBalancePresentation.js";
 
@@ -114,28 +114,8 @@ function ProviderBalanceMoneyRows({
   intl: IntlLike;
   layout: ProviderBalanceLayout;
 }) {
-  const rows: Array<{ key: string; labelKey: string; value: string; emphasis?: boolean }> = [
-    {
-      key: "total",
-      labelKey: "settings.modelProvider.providerBalance.total",
-      value: formatProviderBalanceAmount(balance.currency, balance.total),
-      emphasis: true,
-    },
-  ];
-  if (balance.granted) {
-    rows.push({
-      key: "granted",
-      labelKey: "settings.modelProvider.providerBalance.granted",
-      value: formatProviderBalanceAmount(balance.currency, balance.granted),
-    });
-  }
-  if (balance.toppedUp) {
-    rows.push({
-      key: "toppedUp",
-      labelKey: "settings.modelProvider.providerBalance.toppedUp",
-      value: formatProviderBalanceAmount(balance.currency, balance.toppedUp),
-    });
-  }
+  // 行选择（含「赠金为 0 时只留余额一行」）在 lib 里以纯函数实现，便于单测覆盖。
+  const rows = resolveProviderBalanceMoneyRows(balance);
 
   // 每项一行：标签在左、金额在右。金额是这里唯一的读数，拆成上下两行会让
   // 「余额 / 赠金 / 充值」三行变成六行，也让金额与它的标签在视觉上脱开。

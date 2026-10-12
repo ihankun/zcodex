@@ -4,7 +4,9 @@ import { PROVIDER_USAGE_WINDOW_LIMIT_TYPE, type UsageEntitlementSnapshot } from 
 import {
   formatProviderBalanceAmount,
   hasProviderBalanceContent,
+  isZeroProviderBalanceAmount,
   readProviderBalanceWindowLimits,
+  resolveProviderBalanceMoneyRows,
   resolveProviderBalanceUnavailableMessageKey,
   resolveProviderBalanceWindowLabelKey,
 } from "../src/lib/providerBalancePresentation.js";
@@ -111,5 +113,76 @@ test("provider balance unavailable reasons map to fixed copy", () => {
   assert.equal(
     resolveProviderBalanceUnavailableMessageKey(undefined),
     "settings.modelProvider.providerBalance.unavailable.generic",
+  );
+});
+
+test("zero grant amounts are detected by string form, without float parsing", () => {
+  // 缺失/空串按 0 处理（服务端没给这个分项）。
+  assert.equal(isZeroProviderBalanceAmount(undefined), true);
+  assert.equal(isZeroProviderBalanceAmount(null), true);
+  assert.equal(isZeroProviderBalanceAmount(""), true);
+  // 各种 0 的写法都算 0；带千分位也要认出来。
+  assert.equal(isZeroProviderBalanceAmount("0"), true);
+  assert.equal(isZeroProviderBalanceAmount("0.00"), true);
+  assert.equal(isZeroProviderBalanceAmount("0.000"), true);
+  assert.equal(isZeroProviderBalanceAmount("0,000.00"), true);
+  // 非 0 不误判。
+  assert.equal(isZeroProviderBalanceAmount("0.01"), false);
+  assert.equal(isZeroProviderBalanceAmount("10.00"), false);
+  assert.equal(isZeroProviderBalanceAmount("100"), false);
+});
+
+test("money rows collapse to the balance line when the grant is zero", () => {
+  assert.deepEqual(
+    resolveProviderBalanceMoneyRows({
+      currency: "CNY",
+      total: "110.00",
+      granted: "0.00",
+      toppedUp: "110.00",
+      isAvailable: true,
+    }).map((row) => row.key),
+    ["total"],
+  );
+  // 服务端没给赠金时同理：没有赠金就没有「赠金 / 充值」的区分意义。
+  assert.deepEqual(
+    resolveProviderBalanceMoneyRows({
+      currency: "CNY",
+      total: "110.00",
+      toppedUp: "110.00",
+      isAvailable: true,
+    }).map((row) => row.key),
+    ["total"],
+  );
+});
+
+test("money rows expand the grant/top-up breakdown only when the grant is non-zero", () => {
+  const rows = resolveProviderBalanceMoneyRows({
+    currency: "CNY",
+    total: "110.00",
+    granted: "10.00",
+    toppedUp: "100.00",
+    isAvailable: true,
+  });
+  assert.deepEqual(
+    rows.map((row) => [row.key, row.value, row.emphasis === true]),
+    [
+      ["total", "¥110.00", true],
+      ["granted", "¥10.00", false],
+      ["toppedUp", "¥100.00", false],
+    ],
+  );
+
+  // 赠金非 0 但充值缺失：只多一行赠金，不显示空的充值行。
+  assert.deepEqual(
+    resolveProviderBalanceMoneyRows({
+      currency: "USD",
+      total: "12.00",
+      granted: "2.00",
+      isAvailable: true,
+    }).map((row) => [row.key, row.value]),
+    [
+      ["total", "$12.00"],
+      ["granted", "$2.00"],
+    ],
   );
 });
