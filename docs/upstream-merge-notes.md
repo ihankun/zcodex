@@ -647,35 +647,41 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
   先 `cd apps/zcode-cli/packages/contracts && ../../node_modules/.bin/tsc` 重建即可。
   同理，`packages/*/dist`、`packages/desktop/bundled-agents/`、`apps/zcode-cli/packages/cli/dist/zcode.cjs`
   都是产物：**改了路径字面量后必须重新构建，运行时才生效**（正在运行的 app 不会自动跟上）。
-- **上游 v3.15.1 起 `pnpm fmt:check` 不再是「只检查」：脚本是 `oxfmt --check || oxfmt`。**
-  检查失败时它会**直接格式化整个仓库**并返回成功——既会污染工作区（合并中途尤其危险），
-  又永远拿不到失败信号。要判断格式就用 `node_modules/.bin/oxfmt --check`（仓库级）或
-  `oxfmt --check <file>`，**不要**再把 `pnpm fmt:check` 当检查门。
-  另：上游同时升级了 `oxfmt`，本机旧二进制对上游文件的口径不同，实测 **2463 个文件**被判「不干净」
-  （合并前基线是 31）。判断本地改动是否引入格式问题，必须 `pnpm install` 装上新版后再重算基线。
+- **`pnpm fmt:check` 是 `oxfmt --check`，它只检查、不写文件**（2026-10-12 复核确认：脚本内容与
+  上游一致，跑完 `package.json` 的 md5 不变）。**它从来不是门禁**：`verify:pre-push` 里没有它，
+  而全仓实测有 **2486 个文件**判「不干净」（含大量上游文件、`docs/**`、`.agents/**`）——
+  也就是说这个仓库（上游自己的状态也一样）根本没过 oxfmt 的默认口径。
+  ⚠️ 真正危险的是**写模式**：`pnpm fmt` / `oxfmt`（不带 `--check`）会把那 2486 个文件全部重排，
+  在合并期间等于毁掉工作区。**要判断格式只能对「自己改过的文件」跑 `oxfmt --check <file>`。**
+  （本节此前记的「fmt:check 会格式化全仓并返回成功」是错的，2026-10-12 已更正。）
 - **`oxfmt` 的「复制到 /tmp 再检查」是无效测法。** oxfmt 按**文件路径**解析配置与 ignorePatterns，
   项目外的副本会被跳过（既可能报通过、也可能什么都不做）。要对比「上游版本是否也不干净」，
   用 `git show <ref>:<path> > <项目内临时路径>`（同扩展名、在仓库内）再 `oxfmt --check`。
 - **上游 v3.15.1 带来完整 vitest 测试套件（6236 个测试文件），我们的测试口径必须跟着变。**
   - `pnpm test:unit` = `vitest run`；`pnpm verify:pre-push` 现在是
     `lint && architecture:check --changed && test:unit:affected`。
-  - **我们自己的 4 个 `node:test` 文件会落进 vitest 的 include（`packages/\*/test/**/\*.test.ts`）并被收集，
-在 vitest 下必然失败**（它们用的是 `node:test`）：`packages/services/test/providerBalanceNormalize.test.ts`、
-`packages/ui/test/providerBalancePresentation.test.ts`、`packages/ui/test/modelTriggerDisplay.test.ts`、
-`packages/desktop/test/rendererWindowTitle.test.ts`。**待办：转成 vitest 写法**
-（`import { test, expect } from "vitest"`；注意 `expect(x).toEqual(y)`会忽略`undefined`属性，
-像「不该有 providerPrefix 键」这类回归断言要用`toStrictEqual`）。
-  - 上游新测试里**大量断言上游字面量**（`.zcode` 路径、`ZCode` 应用名/进程名），在本 fork 会失败；
-    `packages/desktop/test/manifestUpdateProvider.test.ts` 更是直接测我们已删除的文件。
-    这批失败属于「上游 spec 与 fork 行为不同」，不要靠改产品代码去迁就。
+  - **我们自己的 4 个测试已转成 vitest**（2026-10-12）：只把 `node:test` 的 `test()` 换成
+    `import { test } from "vitest"`，**断言继续用 `node:assert/strict`** —— `assert.deepEqual` 本身就是严格
+    语义，不会像 `expect().toEqual()` 那样忽略 `undefined` 属性，「不该有 providerPrefix 键」这类回归断言
+    必须保持严格。四个文件（services/providerBalanceNormalize、ui/modelTriggerDisplay、
+    ui/providerBalancePresentation、desktop/rendererWindowTitle）共 21 个用例在 vitest 4.1.4 下全过。
+  - **上游套件在本 fork 必然有一批红**（2026-10-12 实测：1932 个文件里 **89 个失败**、1841 通过、
+    454 个失败用例）。归因已核完：**89 个失败文件里 87 个的源码本身就写着上游字面量**
+    （`.zcode` 路径 / `ZCode` 名称）；其余是「测我们已删除或改过的模块」——
+    `test/manifestUpdateProvider.test.ts`（测已删除文件）、`test/autoUpdaterReadyState.test.ts`
+    （测服务端 manifest provider 与 `deviceMid`）、`test/v4ModelTriggerDisplay.test.ts`（测 providerPrefix）、
+    `test/settingsModelProviderUpgradeIntent.test.ts`（读源码断言 `SettingsPage.tsx` 里有升级 dialog 钩子）。
+    **这批失败是「上游 spec vs fork 行为」，不要靠改产品代码去迁就**；判断某个失败是否新引入，
+    用「该测试文件里有没有上游字面量 + 它测的模块是否在本地改动集里」两步归因。
+  - 少量非归因噪音：`No "execFile" export is defined on the "node:child_process" mock`（上游测试对
+    内置模块做了不完整 mock）、若干 ENOENT / 超时，与 fork 无关。
   - 上游删掉了原来的 4 个 `node:test` 文件（`providerConfigMigration`、`importedClaudeRecovery`、
     两个 `nonCliAcpRetirement`）——第六节 ⑤ 的清单已更新。
 - **`pnpm typecheck` 的项目清单变长了**：现在含 `apps/dev-docs`、`packages/e2e-report`、
   `packages/desktop/tsconfig.e2e.json`，需要新依赖（`vitest`、`@modelcontextprotocol/ext-apps`、
   `lottie-web`、`elkjs`、`@wdio/electron-types`、`@wdio/globals/types`、`mocha`）。
-  没装依赖时它报的是 39 处 `TS2307` + 级联的隐式 any，**全是环境噪音**；
-  要验证本地改动，用合并前那份项目清单做范围化检查：
-  `pnpm exec tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services packages/client packages/server packages/zcode-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json`。
+  **没装依赖时**它报的是 39 处 `TS2307` + 级联的隐式 any，全是环境噪音——别当成代码问题去改。
+  装好依赖后全量 `pnpm typecheck` **exit 0**（2026-10-12 实测），可以直接当门禁。
 - **解冲突时最容易犯的三种错（2026-10-12 实测踩全了，务必用 typecheck + lint 兜住）：**
   1. **hunk 拼接出重复声明**：把「我们的一整段」和「上游的一整段」直接相加，而两段都含同一行
      （`function downloadAvailableUpdate(...)`、`const pendingChannel = ...`、整块 import）。
@@ -766,39 +772,40 @@ grep -rn '"ZCode"\|productName.*ZCode[^ ]' packages/desktop --include='*.json' -
 # 期望：只剩上面两处有意保留的命中 + productName/identity 脚本里的 ZCodex
 
 # ③ fmt 失败清单 ∩ 本地改过/新增的文件，应为空。
-#    **用 `oxfmt --check` 而不是 `pnpm fmt:check`**：后者自 v3.15.1 起是 `oxfmt --check || oxfmt`，
-#    检查失败会直接格式化全仓并返回成功（见第三节）。且上游升级过 oxfmt，本机旧二进制口径下
-#    上游文件大面积「不干净」（2026-10-12 实测 2463 个），**装好新依赖后要重算这个基线**。
-#    真正要盯的是「交集」有没有多出自己改过的文件。
-#    已知例外（上游版本本身就不干净、本 fork 只动了其中一行；格式化它们会在上游文件上产生
-#    几十到几百行 diff）：2026-10-12 合并后交集 30 个文件里 28 个属此类（逐文件与上游版本比对确认），
-#    含 README.md、NOTICE.md、knip.json、electron-builder.config.js、bots/**、
-#    mcpSyncService / settingsSyncService / skillsService / usageStatsService、
+#    `pnpm fmt:check` = `oxfmt --check`（只检查、不写文件），但全仓有 2486 个文件不干净，
+#    它**不是**门禁（`verify:pre-push` 里没有它）。所以只看「交集」：有没有**自己改过的文件**上榜。
+#    **判定方法必须同名比对**：把上游版本 `git show aac4755:<path> > .fmtcheck/<case>/<basename>`，
+#    用原文件名（`package.json` 这类有专门规则的尤其要）再 `oxfmt --check`；上游版本同样不干净
+#    就说明是继承来的，不是自己引入的（2026-10-12 实测：27 个交集文件里 0 个是本地引入）。
+#    结论（2026-10-12 实测）：交集 27 个文件，**同名比对后本地引入 0 个**——全部是「上游版本
+#    自己就不干净、我们只动了其中一行」的文件，不要为了它们跑格式化（会在上游文件上产生
+#    几十到几百行 diff）。含 README.md / NOTICE.md / package.json / electron-builder.config.js /
+#    bots/** / mcpSyncService / settingsSyncService / skillsService / usageStatsService /
 #    ui 的 i18n locales / builtinSkillI18n / mcpStore / TaskActionMenuContent / WorkspaceShellLayout 等。
 comm -12 \
-  <(node_modules/.bin/oxfmt --check 2>&1 | rg -o '^\S+\.(ts|tsx|md|json|html|mjs|cjs|js) ' | sed 's/ $//' | sort -u) \
+  <(node_modules/.bin/oxfmt --check 2>&1 | grep -E '\([0-9]+m?s\)$' | sed -E 's/ \([0-9]+m?s\)$//' | sed 's/^[^ ]* //' | sort -u) \
   <(git diff --name-only aac4755 -- . | sort)
-# 期望：无输出（例外文件按上一条逐个人工确认）
+# 期望：27 个文件；逐个按上面的「同名比对」确认上游版本同样不干净
 
 # ④ 必跑验证
-pnpm lint && pnpm architecture:check --changed
-# typecheck：上游 v3.15.1 起项目清单含 apps/dev-docs / packages/e2e-report / tsconfig.e2e.json，
-# 需要新依赖；没装依赖时 `pnpm typecheck` 报的全是环境噪音。范围化验证用合并前那份清单：
-pnpm exec tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services \
-  packages/client packages/server packages/zcode-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json
-# 改动过 main / preload / renderer 时额外跑（既有缺口基线：main 92、renderer 161，别让它变多）
+pnpm typecheck && pnpm lint && pnpm architecture:check --changed
+# 基线（2026-10-12，依赖已装）：typecheck exit 0；lint 62 warnings / 0 errors；
+#   architecture 0 违规。没装依赖时 typecheck 报的 39 处 TS2307 是环境噪音，先 pnpm install。
+# 改动过 main / preload / renderer 时额外跑（既有缺口基线：main 84、renderer 154，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
 pnpm exec tsc -p packages/desktop/tsconfig.renderer.json --noEmit
 
-# ⑤ 自有测试（2026-10-12 现状：**我们自己的 node:test 文件与上游 vitest 套件并存**）
-#    上游 v3.15.1 的 vitest include 是 `packages/*/test/**/*.test.ts`，会把这 4 个文件一并收集，
-#    因此 `pnpm test:unit` 目前对它们必然失败——**待办：转成 vitest 写法**（见第三节）。
-#    转换完成前用 tsx 单独跑（**必须在包目录内跑**：ui 的测试走 `@/*` 别名，
-#    从仓库根跑会以 `Cannot find package '@/lib'` 报假失败）。
-cd packages/services && ../../node_modules/.bin/tsx --test test/providerBalanceNormalize.test.ts
-cd packages/ui       && ../../node_modules/.bin/tsx --test test/modelTriggerDisplay.test.ts test/providerBalancePresentation.test.ts
-cd packages/desktop  && ../../node_modules/.bin/tsx --test test/rendererWindowTitle.test.ts
-# 基线：services 6 / ui 12 / desktop 3，共 21 passed（2026-10-12）
+# ⑤ 自有测试（2026-10-12 起**已全部转成 vitest**，跟着上游套件一起跑）
+#    四个文件：services/providerBalanceNormalize、ui/modelTriggerDisplay、ui/providerBalancePresentation、
+#    desktop/rendererWindowTitle。只把 `node:test` 的 test() 换成 vitest 的 test()，
+#    断言继续用 `node:assert/strict`——`assert.deepEqual` 本身就是严格语义，
+#    不会像 `expect().toEqual()` 那样忽略 undefined 属性（"不该有 providerPrefix 键"这类断言必须严格）。
+node_modules/.bin/vitest run \
+  packages/services/test/providerBalanceNormalize.test.ts \
+  packages/ui/test/modelTriggerDisplay.test.ts \
+  packages/ui/test/providerBalancePresentation.test.ts \
+  packages/desktop/test/rendererWindowTitle.test.ts
+# 基线：services 6 / ui 12 / desktop 3，共 21 passed（2026-10-12，vitest 4.1.4）
 #    ui/test/modelTriggerDisplay.test.ts 钉的是 2.3.6「触发器不显示厂商前缀、tooltip 保留来源」
 #      这条本地定制，合并上游后必须跑：改回上游实现会产出 providerPrefix，该测试会红。
 #    desktop/test/rendererWindowTitle.test.ts 钉的是 2.1 里「窗口标题 ↔ 渲染进程名」的耦合：
@@ -881,16 +888,19 @@ cd apps/zcode-cli/packages/bootstrap
 | 结构性               | `package.json` / `knip.json` / `.gitignore` / `NOTICE.md`                                                                                                | 保留本地（fork 版本号、机器产物忽略、更新流程描述），采纳上游新增条目（vendor 排除项已于 2026-10-12 随载荷机制删除）              |
 | 上游新增源码里的路径 | 22 个文件、205 处 `.zcode`                                                                                                                               | 按 2.2 规则改名（含上游新增的 `wdio.conf.ts` E2E 配置）；`*-plugin/` 官方载荷文档与 `docs/` 设计文档按 2.2.2 保持原样             |
 
-**上游带来的新依赖（必须 `pnpm install`，本次因断网未装）**：`vitest`（含
-`@vitest/coverage-v8` 等）、`@modelcontextprotocol/ext-apps`、`lottie-web`、`elkjs`、
-`@wdio/electron-types`、`@wdio/globals`、`mocha`、以及上游升级的 `oxfmt`。装好后要重算：
-`pnpm typecheck` 基线、fmt 基线（旧二进制口径下 2463 个「不干净」，不可信）、
-`pnpm test:unit` 的失败集。
+**上游带来的新依赖（`pnpm install` 已在 2026-10-12 完成）**：`vitest`（4.1.4）、
+`@modelcontextprotocol/ext-apps`、`lottie-web`、`elkjs`、`@wdio/electron-types`、`@wdio/globals`、
+`mocha`、`oxfmt` 0.41.0。装好后的实测基线：`pnpm typecheck` **exit 0**（装之前是 39 处 TS2307 噪音）、
+fmt 全仓 **2486 个文件**「不干净」（与本地改动集交集 27 个，同名比对后**本地引入 0 个**）、
+`pnpm test:unit` **89 个文件失败 / 1841 通过 / 454 个失败用例**（归因见第三节）。
 
-**本次复核出的异常（已写入第三节）**：`pnpm fmt:check` 变成会格式化全仓的脚本；上游 vitest 会
-收集我们的 `node:test` 文件（待转 vitest）；上游新测试大量断言上游字面量，在本 fork 必然失败；
+**本次复核出的异常（已写入第三节）**：全仓 2486 个文件不符合 oxfmt 口径（`fmt:check` 不是门禁，
+且**不能**用写模式跑）；上游 vitest 会收集我们的 `node:test` 文件（**已转 vitest**）；
+上游测试大量断言上游字面量，在本 fork 必然有一批红（89 个文件，归因见第三节）；
 `pnpm typecheck` 清单变长需要新依赖；解冲突时踩到「hunk 拼接出重复声明」「上游新代码消费了我们
 删掉的 state 字段」「忘了带上游新增的 export / 改名」三类错。
+（**更正**：本次记录初稿曾写「`pnpm fmt:check` 是 `oxfmt --check || oxfmt`、会格式化全仓并返回成功」，
+2026-10-12 复核确认脚本一直是 `oxfmt --check`、只读不写——那条结论是错的，已从第三节删掉。）
 
 **上游开源内置插件源码，2.6 的入库载荷整体失效（当天已按用户决定删除）**：v3.15.1 把 12 个插件的
 源码全部随仓库发布，`stageVendoredOfficialPlugins` 对每个 vendor 目录都走「源码优先」分支，
@@ -907,10 +917,11 @@ ios/android 模拟器 README、`bundled-skills` README 与 dynamic-workflows 示
 （`--task-index` / `--cli-db`）改为 `.zcodex`（来源仍保持 `~/.zcode`，那是历史遗留数据）。
 上游测试与 `apps/zcode-cli/docs/**` 一律不动——它们断言/描述的是上游行为。
 
-**合并后自查结果：** 第六节两条 grep 干净；`pnpm lint` 62 警告 0 错误；
-`pnpm architecture:check --changed` 0 违规；范围化 typecheck 仅剩环境类缺模块错误；
-主进程 `tsconfig.main.json` 86 → **92**、渲染进程 125/126 → **161**，新增部分逐行比对确认全部落在
-**上游逐字代码**里（本地定制文件未新增）；自有单测 21 个全过。
+**合并后自查结果（依赖装齐后的最终口径，2026-10-12）**：第六节两条 grep 干净；
+`pnpm typecheck` exit 0；`pnpm lint` 62 警告 0 错误；`pnpm architecture:check --changed` 0 违规；
+主进程 `tsconfig.main.json` 86 → **84**、渲染进程 125/126 → **154**（装依赖后比合并当天的 92/161 又降了
+8/7 个，新增部分逐行比对确认全部落在**上游逐字代码**里）；自有单测 21 个在 vitest 下全过；
+`pnpm test:unit` 89 个文件失败，全部可归因到上游字面量或我们有意删改的功能。
 
 ## 八、注意事项
 

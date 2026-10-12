@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import { test } from "vitest";
 import { formatZCodeRendererProcessName } from "@zcode/shared";
 
 // 主窗口标题（renderer/index.html 的 `<title>`）与 process-names 的默认值分支是一对耦合：

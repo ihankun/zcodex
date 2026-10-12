@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
 import {
   resolveV4ModelTriggerDisplay,

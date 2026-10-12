@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { ApiError, PROVIDER_USAGE_WINDOW_LIMIT_TYPE } from "@zcode/shared";
 import { normalizeDeepSeekBalance } from "../src/usage-stats/providers/deepseekBalanceProvider.js";
 import { normalizeOpenCodeGoUsage } from "../src/usage-stats/providers/openCodeGoUsageProvider.js";
