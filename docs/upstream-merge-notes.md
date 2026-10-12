@@ -1,12 +1,13 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
-> 上游基线：ZCode v3.14.3 = `29628c9`（= `origin/main`）。fork 版本号独立演进，当前 `1.1.2`。
+> 上游基线：**ZCode v3.15.1 = `aac4755`**（= `origin/main`；上一基线 v3.14.3 = `29628c9`，已并入 dev）。
+> fork 版本号独立演进，当前 `1.2.0`。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
-> `git diff 29628c9 dev -- . ':(exclude)packages/desktop/vendor'` 即全部本地改动；
+> `git diff aac4755 dev -- . ':(exclude)packages/desktop/vendor'` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-10-08。
+> 最近复核：2026-10-12（合并 v3.15.1）。
 
 ## 一、概览
 
@@ -217,8 +218,10 @@
 两处菜单都要改，它们是**不同的东西**，别只改一处：
 
 **① app 内的帮助下拉**（`packages/ui/src/WorkspaceHelpMenuButton.tsx`）——移除指向上游产品服务的
-四项：**产品文档 / 用户社群 / 问题上报 / 给产品提需求**；只保留「资源管理器 / 检查更新 / 关于 ZCodex」。
-顺带删掉了现在会打头的分隔线，并加了「非桌面端不渲染该按钮」的门（剩下三项全是桌面专属，
+五项：**产品文档 / 用户社群 / 问题上报 / 给产品提需求**（本地定制），以及上游 v3.15.1 新增的
+**报告安全问题**（`vulnerabilityReport*`，同样是上游产品服务入口，一并不显示）。
+保留「导出日志 / 资源管理器 / 检查更新 / 关于 ZCodex」，其中导出日志是上游 v3.15.1 新增项，本地采纳。
+顺带删掉了现在会打头的分隔线，并加了「非桌面端不渲染该按钮」的门（剩下几项全是桌面专属，
 Web 上否则会剩一个点开是空的菜单）。
 
 **② macOS 原生菜单栏的「帮助」菜单**（`packages/desktop/src/main/desktopApplicationMenu.ts`）——
@@ -227,15 +230,16 @@ Web 上否则会剩一个点开是空的菜单）。
 非 macOS 分支（关于 / 检查更新）自带的分隔线保留。菜单剩下：切换开发者工具 / 资源管理器 /
 导出日志 / 清除所有数据（后两者之间、以及资源管理器之前的分隔线仍在）。
 
-- `packages/ui/src/lib/helpMenuActions.ts` **保留为不可达代码**（它只服务被移除的两项）：
-  理由同第三节的 `forceUpdateGuard`——留着与上游逐字节一致，删除会让上游每次改动都产生
-  delete/modify 冲突。已知代价：`pnpm knip` 会把它列进 unused files（基线噪音）。
+- `packages/ui/src/lib/helpMenuActions.ts` **不是死代码，别删**（2026-10-12 更正）：
+  上游 v3.15.1 起「导出日志」走 `helpMenuActions.exportLogs`（①里保留的那项），
+  Windows 自绘标题栏菜单 `WindowsCaptionMenuButton.tsx` 还用它做 `openIssueReport` /
+  `openProductDocs` / `exportLogs`（上游文件，本地未动）。该文件与上游逐字节一致。
 - `DesktopCommandIds.OpenChangelog` 的 handler（`desktopCommandHandlers.ts`）与
   `desktopMenu.ts` 的 `helpWhatsNew` / `helpFeedback` 文案**保留**：前者与上游逐字节一致、
   后者仍是命令面板等处的文案来源（同下条）。
 - **仍未动**：命令面板（`quickpick/quickPickCommands.ts`）里仍有这四个命令；
-  i18n 的 `workspaceHeader.help.{docs,community,issueReport,productRequest}` 与
-  `desktopMenu.ts` 的 `titleBar.menu.help.{whatsNew,feedback}` 文案都保留（它们仍是那处的文案来源）。
+  i18n 的 `workspaceHeader.help.{docs,community,issueReport,productRequest,reportVulnerability}` 与
+  `desktopMenu.ts` 的 `titleBar.menu.help.{whatsNew,feedback}` 文案都保留（它们仍是别处的文案来源）。
 
 #### 2.3.8 左下角账号菜单移除「升级」入口（2026-10-09）
 
@@ -247,11 +251,15 @@ Web 上否则会剩一个点开是空的菜单）。
 
 - `WorkspaceSidebarFooterUsageSummary.tsx`：删掉该菜单项，以及只为它服务的导入
   （`useCodingPlanEntryGate`、`isMaxCodingPlanSnapshot`、`createCodingPlanFunnelContext`、
-  `resolveCodingPlanEntryPlanState`、`resolveSidebarCodingPlanUpgradeFallbackProviderId`）与局部量
-  （`upgradeActionLabelId`、`upgradeProviderSnapshot`）；state hook 里为它计算的
-  `upgradeTargetProviderId` / `selectedUpgradeProviderId` 一并删除。
+  `resolveCodingPlanEntryPlanState`）与局部量（`upgradeActionLabelId`、`upgradeProviderSnapshot`）。
 - `WorkspaceSidebarFooter.tsx`、`WorkspaceSidebar.tsx`、`SettingsPage.tsx`：`onUpgradeClick`
   这条 prop 链、两侧的 `handleOpenCodingPlanUpgrade*` 与 `useCodingPlanUpgradeDialog()` 解构都已删除。
+- **`upgradeTargetProviderId` / `selectedUpgradeProviderId` 必须保留**（2026-10-12 更正）：
+  上游 v3.15.1 新增的营销触达 `components/marketing-touch/MarketingTouchProvider.tsx` 会调用
+  `useWorkspaceSidebarFooterUsageSummaryState()` 并消费 `upgradeTargetProviderId`（用于定位升级目标
+  弹窗）。连带 `resolveSidebarCodingPlanUpgradeFallbackProviderId` 的导入与
+  `SidebarUsageCodingPlanProviderId` 类型导入也要留着。合并时若按旧笔记把这两个量删掉，
+  上游新代码会因取不到字段而报类型错误——这是本次合并踩到的坑之一（第三节）。
 - **刻意保留**：`WorkspaceSidebarFooterUsageSummaryContent` 的 `state` prop 现在不再被读取，
   但**保留声明**——清掉它会牵动调用方（footer，以及同文件里那个全仓已无人引用的包装组件
   `WorkspaceSidebarFooterUsageSummary`）与 footer 的 state 计算，收益不抵改动面。
@@ -366,6 +374,10 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 **先排除误判**：这跟 fork 版本号（1.1.x vs 上游 3.14.x）无关，两边 `cdn-marketplace.json` 条目数相同（26）。
 判定链是「内置定义表（已在开源仓库） + 载荷（原先缺，现已入库） → 启动 seed → 内置市场分片」。
 
+> **前提已变（2026-10-12）**：上面这条「开源仓库只有两个插件源码」在**上游 v3.15.1 之后不再成立** ——
+> 12 个插件源码全部随仓库发布，本节的入库载荷与暂存逻辑因此整体冗余。结论与证据见本节末
+> 「2026-10-12 复核」；本节其余内容作为机制说明与历史记录保留。
+
 **这 12 个载荷已入库**（原先只在本地、被 `.gitignore` 忽略）。原因：载荷只在某一台机器上存在时，
 在另一平台（尤其 Windows）干净检出后打包就又没有插件，必须能随仓库一起走。
 入库后任意平台打包都会带上，不再需要各机器手工从官方 app 拷一份。
@@ -424,6 +436,34 @@ plugin-creator / skill-creator / restore-legacy-sessions / zcode-guide / zcode-c
 - 这些是官方预编译资产，自用可以，**对外分发存在许可风险**。
 
 #### 实测结果
+
+**2026-10-12（上游 v3.15.1 合并后复核）：本组机制已整体失效，载荷全部冗余。**
+
+上游 v3.15.1 把原先只存在于官方安装包里的插件**源码**全部开源了：
+`apps/zcode-cli/packages/{android-emulator,documents,image-search,ios-simulator,pdf,plugin-creator,
+presentations,restore-legacy-sessions,skill-creator,spreadsheets,zcode-cua,zcode-guide}-plugin`
+（外加新增的 `superpowers-plugin`、`visualize-plugin`）现在都有 `.zcode-plugin/plugin.json`。
+后果与实测：
+
+- `stageVendoredOfficialPlugins` 的「仓库源码 > vendor」判定现在对**每一个** vendor 目录都成立，
+  实测输出：`staged: []`、`skipped: [14 个]`、目标 `glm/packages` 为空目录。
+- 打包链自己补齐了：`prepare-agent-node-bundle.mjs` 的 `stageOfficialPlugins()` 按源码
+  stage 到 `glm/packages/*-plugin`（另有 `bundled-skills`、sharp/koffi 闭包），
+  它的 `buildCliBundle()` 又会回调 `build-desktop-agent-cli.mjs` → `stageAgentBundle`。
+- dev 链根本不走 `glm/packages` 找插件：monorepo dev 的 agent 入口是
+  `apps/zcode-cli/packages/cli/dist/zcode.cjs`（`zcodeAgentProcessManager.ts` 的
+  `resolveBundledWorkspaceZCodeAgentCommand`，优先级高于打包态 Electron Node 分支），
+  于是 `candidateBaseDirs()` 的 `entrypointDir()` = `apps/zcode-cli/packages/cli/dist`，
+  命中定义表的 `../../<name>-plugin` 候选 —— **dev 一直是从源码树 seed 的**，
+  vendor 副本在 dev 里从来没被选中过。
+
+**因此**：这 61MB 载荷 + `stageVendoredOfficialPlugins` + `.gitignore` 的四条排除 +
+`.oxlintrc.json`/`.prettierignore`/`knip.json` 的 vendor 排除**都已成为死重量**，可以整体删除
+（顺带消掉官方预编译资产的对外分发许可风险）。覆盖度已核对：打包链的 `officialPluginPackages`
+（15 条）与定义表的 15 条**一一对应**（含新增的 `visualize`），另加 `node-repl-host` 与
+`bundled-skills` 两个非 `*-plugin` 单元，所以删掉 vendor 不会漏插件。
+**这是一项待用户拍板的清理，不在合并中执行**；未删除前保持现状即可，vendor 侧恒跳过、
+不会与源码 staging 打架。
 
 **2026-09-28（官方 app 3.14.3 + fork 1.1.0，定义表尚未对齐）：**
 
@@ -680,6 +720,54 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
   先 `cd apps/zcode-cli/packages/contracts && ../../node_modules/.bin/tsc` 重建即可。
   同理，`packages/*/dist`、`packages/desktop/bundled-agents/`、`apps/zcode-cli/packages/cli/dist/zcode.cjs`
   都是产物：**改了路径字面量后必须重新构建，运行时才生效**（正在运行的 app 不会自动跟上）。
+- **上游 v3.15.1 起 `pnpm fmt:check` 不再是「只检查」：脚本是 `oxfmt --check || oxfmt`。**
+  检查失败时它会**直接格式化整个仓库**并返回成功——既会污染工作区（合并中途尤其危险），
+  又永远拿不到失败信号。要判断格式就用 `node_modules/.bin/oxfmt --check`（仓库级）或
+  `oxfmt --check <file>`，**不要**再把 `pnpm fmt:check` 当检查门。
+  另：上游同时升级了 `oxfmt`，本机旧二进制对上游文件的口径不同，实测 **2463 个文件**被判「不干净」
+  （合并前基线是 31）。判断本地改动是否引入格式问题，必须 `pnpm install` 装上新版后再重算基线。
+- **`oxfmt` 的「复制到 /tmp 再检查」是无效测法。** oxfmt 按**文件路径**解析配置与 ignorePatterns，
+  项目外的副本会被跳过（既可能报通过、也可能什么都不做）。要对比「上游版本是否也不干净」，
+  用 `git show <ref>:<path> > <项目内临时路径>`（同扩展名、在仓库内）再 `oxfmt --check`。
+- **上游 v3.15.1 带来完整 vitest 测试套件（6236 个测试文件），我们的测试口径必须跟着变。**
+  - `pnpm test:unit` = `vitest run`；`pnpm verify:pre-push` 现在是
+    `lint && architecture:check --changed && test:unit:affected`。
+  - **我们自己的 4 个 `node:test` 文件会落进 vitest 的 include（`packages/\*/test/**/\*.test.ts`）并被收集，
+在 vitest 下必然失败**（它们用的是 `node:test`）：`packages/services/test/providerBalanceNormalize.test.ts`、
+`packages/ui/test/providerBalancePresentation.test.ts`、`packages/ui/test/modelTriggerDisplay.test.ts`、
+`packages/desktop/test/rendererWindowTitle.test.ts`。**待办：转成 vitest 写法**
+（`import { test, expect } from "vitest"`；注意 `expect(x).toEqual(y)`会忽略`undefined`属性，
+像「不该有 providerPrefix 键」这类回归断言要用`toStrictEqual`）。
+  - 上游新测试里**大量断言上游字面量**（`.zcode` 路径、`ZCode` 应用名/进程名），在本 fork 会失败；
+    `packages/desktop/test/manifestUpdateProvider.test.ts` 更是直接测我们已删除的文件。
+    这批失败属于「上游 spec 与 fork 行为不同」，不要靠改产品代码去迁就。
+  - 上游删掉了原来的 4 个 `node:test` 文件（`providerConfigMigration`、`importedClaudeRecovery`、
+    两个 `nonCliAcpRetirement`）——第六节 ⑤ 的清单已更新。
+- **`pnpm typecheck` 的项目清单变长了**：现在含 `apps/dev-docs`、`packages/e2e-report`、
+  `packages/desktop/tsconfig.e2e.json`，需要新依赖（`vitest`、`@modelcontextprotocol/ext-apps`、
+  `lottie-web`、`elkjs`、`@wdio/electron-types`、`@wdio/globals/types`、`mocha`）。
+  没装依赖时它报的是 39 处 `TS2307` + 级联的隐式 any，**全是环境噪音**；
+  要验证本地改动，用合并前那份项目清单做范围化检查：
+  `pnpm exec tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services packages/client packages/server packages/zcode-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json`。
+- **解冲突时最容易犯的三种错（2026-10-12 实测踩全了，务必用 typecheck + lint 兜住）：**
+  1. **hunk 拼接出重复声明**：把「我们的一整段」和「上游的一整段」直接相加，而两段都含同一行
+     （`function downloadAvailableUpdate(...)`、`const pendingChannel = ...`、整块 import）。
+     合并后 `oxlint` 会报 `Identifier 'x' has already been declared`，主进程 tsc 更会因语法错误**提前中止**
+     （错误数从 92 掉到 1，看着像变好了，其实根本没检查完）。
+  2. **上游新增代码消费了我们删掉的东西**：本轮 `MarketingTouchProvider` 用了
+     `upgradeTargetProviderId`（我们在 2.3.8 删了），`helpMenuActions`（我们标记为不可达）
+     又被上游新增的「导出日志」项用上。**结论：删 UI 元素时只删「渲染 + 该元素独有的数据流」，
+     共享的 state 字段/工具函数要先确认上游有没有新消费者**；解完冲突立刻跑范围化 typecheck。
+  3. **「取上游 + 重新施加改名」时忘了上游也改了导入/导出**：本轮上游把 `downloadAvailableUpdate`
+     导出（供其单测）、把 `createWindowsDesktopTray` 改名 `createDesktopTray`、
+     给 `OFFICIAL_ZCODE_GUIDE_REQUIRED_SEED_PATHS` 加 `export` —— 重新施加本地改名时要把这些一起带上。
+- **别把「vendor 载荷被全部跳过」误判成「dev 少了插件」。** 上游 v3.15.1 起所有内置插件都有源码，
+  `stageVendoredOfficialPlugins` 会打印 `skipped … 14 个`、`staged: []`，看着像 dev 要丢插件；
+  实际 dev 的 agent 入口是 `apps/zcode-cli/packages/cli/dist/zcode.cjs`
+  （`zcodeAgentProcessManager.ts` 的 `resolveBundledWorkspaceZCodeAgentCommand`，优先于打包态分支），
+  插件由定义表的 `../../<name>-plugin` 候选从**源码树**解析，打包链则由
+  `prepare-agent-node-bundle.mjs` 的 `stageOfficialPlugins()` 按源码 stage 到 `glm/packages`。
+  两处都不依赖 vendor 载荷 —— 详见 2.6 的 2026-10-12 复核。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
@@ -725,49 +813,74 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
 #    vendor 载荷、mock-cdn 与 bundled-agents 里的 `.zcode` 也是刻意保留的（官方的
 #    restore-legacy-sessions 会扫描旧数据目录，zcode-guide 技能文档仍按官方原样写
 #    `.zcode/config.json`），故一并排除——它们都是产物或第三方资产，不是本仓源码。
+#
+#    **2026-10-12（v3.15.1）起必须再排除四类上游资产，否则输出 1720 行噪音**：
+#      · 上游 vitest / E2E 测试与夹具（`**/test/**`、`**/e2e/**`、`*.test.ts(x)`）——1556+ 行，全是上游字面量；
+#      · `apps/zcode-cli/docs/**` 上游设计文档——88 行（2.2.2 刻意不改）；
+#      · `apps/zcode-cli/packages/*-plugin/**` 官方插件**源码**——76 行（v3.15.1 开源后由
+#        vendor 载荷变成源码；其中 zcode-guide 42 行、restore-legacy-sessions 19 行）；
+#      · `bundled-skills` 与 `dynamic-workflow/docs` 等其余随源码发布的官方内容。
+#    排除后应无输出。
 grep -rnE '"\.zcode"|\.zcode[\\/]|~/\.zcode([^a-zA-Z0-9_-]|$)|homedir\(\), "\.zcode"' \
   packages apps scripts config --include='*.ts' --include='*.tsx' --include='*.mjs' --include='*.md' \
   | grep -v node_modules | grep -v '/dist/' | grep -v '/out/' \
-  | grep -v bundled-agents | grep -v mock-cdn \
-  | grep -v 'packages/desktop/vendor/' | grep -v 'com\.zcode/'
-# 期望：无输出（2026-10-08 实测改前 89 处、改后 0 处）
+  | grep -v bundled-agents | grep -v mock-cdn | grep -v bundled-skills \
+  | grep -v 'packages/desktop/vendor/' | grep -v 'com\.zcode/' \
+  | grep -vE '/(test|tests|e2e|__tests__|docs)/|\.test\.ts' \
+  | grep -v '^apps/zcode-cli/packages/[^/]*-plugin/'
+# 期望：无输出（2026-10-12 实测排除后 0 行）
 
 # ② 应用名应保持 ZCodex。下面两处命中是**有意保留**的旧标识，不要改：
 #    - packages/desktop/package.json 的 "author": "ZCode"（作者字段，不是产品名）
 #    - packages/desktop/src/main/mcpUserDirectory/legacy.ts 的 join(appData, "ZCode", …)
 #      （从旧版 ZCode 的 appData 目录迁移数据的历史路径）
-grep -rn '"ZCode"\|productName.*ZCode[^ ]' packages/desktop --include='*.json' --include='*.ts' --include='*.mjs'
+#    2026-10-12 起 `packages/desktop/test/**`（含 E2E）会给出几十条 `"ZCode"`，全是上游测试
+#    的期望字面量（上游应用名仍是 ZCode），**不是本地回归**，排除即可。
+grep -rn '"ZCode"\|productName.*ZCode[^ ]' packages/desktop --include='*.json' --include='*.ts' --include='*.mjs' \
+  | grep -v node_modules | grep -v '/test/'
+# 期望：只剩上面两处有意保留的命中 + productName/identity 脚本里的 ZCodex
 
 # ③ fmt 失败清单 ∩ 本地改过/新增的文件，应为空。
-#    上游自带失败基线：31 个（2026-10-08）。总数只增不减是正常的（上游新文件不跑 oxfmt），
+#    **用 `oxfmt --check` 而不是 `pnpm fmt:check`**：后者自 v3.15.1 起是 `oxfmt --check || oxfmt`，
+#    检查失败会直接格式化全仓并返回成功（见第三节）。且上游升级过 oxfmt，本机旧二进制口径下
+#    上游文件大面积「不干净」（2026-10-12 实测 2463 个），**装好新依赖后要重算这个基线**。
 #    真正要盯的是「交集」有没有多出自己改过的文件。
-#    例外（上游版本本身就不干净，本 fork 只动了其中一行文案；格式化它们会在上游文件上产生
-#    几十到几百行 diff，与「只格式化本地改动的文件」冲突）：README.md、
-#    packages/services/src/bots/{feishuChannelRuntime,telegramChannelRuntime,weixinChannelRuntime}.ts、
-#    packages/services/src/bots/providers/weixinProvider.ts
+#    已知例外（上游版本本身就不干净、本 fork 只动了其中一行；格式化它们会在上游文件上产生
+#    几十到几百行 diff）：2026-10-12 合并后交集 30 个文件里 28 个属此类（逐文件与上游版本比对确认），
+#    含 README.md、NOTICE.md、knip.json、electron-builder.config.js、bots/**、
+#    mcpSyncService / settingsSyncService / skillsService / usageStatsService、
+#    ui 的 i18n locales / builtinSkillI18n / mcpStore / TaskActionMenuContent / WorkspaceShellLayout 等。
 comm -12 \
-  <(pnpm fmt:check 2>&1 | grep -E '\([0-9]+m?s\)$' | sed -E 's/ \([0-9]+m?s\)$//' | sed 's/^[^ ]* //' | sort) \
-  <(git diff --name-only 29628c9 -- . ':(exclude)packages/desktop/vendor' | sort) \
-  | grep -vE '^README\.md$|^packages/services/src/bots/(feishuChannelRuntime|telegramChannelRuntime|weixinChannelRuntime)\.ts$|^packages/services/src/bots/providers/weixinProvider\.ts$'
-# 期望：无输出（2026-10-08 实测通过）
+  <(node_modules/.bin/oxfmt --check 2>&1 | rg -o '^\S+\.(ts|tsx|md|json|html|mjs|cjs|js) ' | sed 's/ $//' | sort -u) \
+  <(git diff --name-only aac4755 -- . ':(exclude)packages/desktop/vendor' | sort)
+# 期望：无输出（例外文件按上一条逐个人工确认）
 
 # ④ 必跑验证
-pnpm typecheck && pnpm lint && pnpm architecture:check --changed
-# 改动过 main / preload / renderer 时额外跑（既有缺口基线 86 个错误，别让它变多）
+pnpm lint && pnpm architecture:check --changed
+# typecheck：上游 v3.15.1 起项目清单含 apps/dev-docs / packages/e2e-report / tsconfig.e2e.json，
+# 需要新依赖；没装依赖时 `pnpm typecheck` 报的全是环境噪音。范围化验证用合并前那份清单：
+pnpm exec tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services \
+  packages/client packages/server packages/zcode-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json
+# 改动过 main / preload / renderer 时额外跑（既有缺口基线：main 92、renderer 161，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
+pnpm exec tsc -p packages/desktop/tsconfig.renderer.json --noEmit
 
-# ⑤ 自有测试文件很少，用 node:test + tsx 跑。
-#    **必须在包目录内跑**：ui 的测试走 `@/*` 别名，从仓库根跑时 tsx 取根 tsconfig（无该别名），
-#    会以 `Cannot find package '@/lib'` 报假失败（2026-10-08 实测）。
-cd packages/services && ../../node_modules/.bin/tsx --test test/*.test.ts
-cd packages/ui       && ../../node_modules/.bin/tsx --test test/*.test.ts
-cd packages/desktop  && ../../node_modules/.bin/tsx --test test/*.test.ts
-# 基线：services 10 passed / ui 10 passed / desktop 3 passed（2026-10-08）
+# ⑤ 自有测试（2026-10-12 现状：**我们自己的 node:test 文件与上游 vitest 套件并存**）
+#    上游 v3.15.1 的 vitest include 是 `packages/*/test/**/*.test.ts`，会把这 4 个文件一并收集，
+#    因此 `pnpm test:unit` 目前对它们必然失败——**待办：转成 vitest 写法**（见第三节）。
+#    转换完成前用 tsx 单独跑（**必须在包目录内跑**：ui 的测试走 `@/*` 别名，
+#    从仓库根跑会以 `Cannot find package '@/lib'` 报假失败）。
+cd packages/services && ../../node_modules/.bin/tsx --test test/providerBalanceNormalize.test.ts
+cd packages/ui       && ../../node_modules/.bin/tsx --test test/modelTriggerDisplay.test.ts test/providerBalancePresentation.test.ts
+cd packages/desktop  && ../../node_modules/.bin/tsx --test test/rendererWindowTitle.test.ts
+# 基线：services 6 / ui 12 / desktop 3，共 21 passed（2026-10-12）
 #    ui/test/modelTriggerDisplay.test.ts 钉的是 2.3.6「触发器不显示厂商前缀、tooltip 保留来源」
 #      这条本地定制，合并上游后必须跑：改回上游实现会产出 providerPrefix，该测试会红。
 #    desktop/test/rendererWindowTitle.test.ts 钉的是 2.1 里「窗口标题 ↔ 渲染进程名」的耦合：
 #      它读 renderer/index.html 的 `<title>` 喂给 formatZCodeRendererProcessName，断言得到
 #      `zcode-renderer-main`。只把标题单边改回 `ZCode`（或只改一处）就会红。
+#    services/test/providerBalanceNormalize.test.ts、ui/test/providerBalancePresentation.test.ts
+#      钉的是 2.9 余量查询的归一化与展示规则。
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
@@ -821,6 +934,52 @@ cd apps/zcode-cli/packages/bootstrap
 `pnpm typecheck` / `pnpm lint`（70 警告 0 错误）/ `pnpm architecture:check --changed` 通过。
 `tsconfig.main.json` 类型错误 82 → 86、`tsconfig.renderer.json` 125 → 126，新增部分全部落在与上游
 逐字节一致的文件里（上游自身的既有类型缺口），本地定制文件没有新增错误。
+
+### 2026-10-12 上游 v3.14.3 → v3.15.1
+
+上游提交：`aac4755 feat: update to v3.15.1`（11736 文件，+1942918/−25090；含上游首次开放的
+内置插件源码、vitest 测试套件与 dev-docs / e2e-report 等新工作区）。
+
+**冲突 36 处，全部落在本文档预测范围内**（这是对文档健壮性的一次实测：没有一处是文档没提到的）。
+处理方式与逐条裁决见合并提交 `147ce14b` 的说明；要点：
+
+| 类别                 | 文件                                                                                                                                                     | 处理                                                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 纯字面量改名         | 17 个（`paths.ts`、`rootsResolver.ts`、`mcpUserDirectory`、`zcodeAgent`、`subagents`、`installer.nsh`、i18n locales、`builtinSkillI18n`、`SKILL.md` 等） | 取上游版本后重新施加 `.zcode`→`.zcodex` / `ZCode`→`ZCodex`                                                                        |
+| 结构性               | `autoUpdater.ts`                                                                                                                                         | 保留 GitHub Release 与手动安装；采纳上游 stale-ready 守卫、下载失败复查、`downloadAvailableUpdate` 导出                           |
+| 结构性               | `main/index.ts`                                                                                                                                          | 保留 `applyAppIcon` 条件与 force-gate 移除；采纳上游 tray 改名与能力探测                                                          |
+| 结构性               | `manifestUpdateProvider.ts`（上游改 / 本地删）、`services/device/deviceMid.ts`（上游删 / 本地改）                                                        | 前者保留删除，后者接受删除（逻辑重构进 CLI adapters）                                                                             |
+| 结构性               | `services/node.ts`                                                                                                                                       | CUA helper 候选路径改由上游 `resolveStandaloneStatusLaunchCandidates` 提供（开源构建占位返回空），本地在该处的 `.zcodex` 随之消失 |
+| 结构性               | `official-plugin-definitions.ts`                                                                                                                         | 保住 zcode-guide 的 `version: 0.3.0` 与 6 条 `requiredSeedPaths`，采纳上游 `export`                                               |
+| 结构性               | `WorkspaceHelpMenuButton.tsx`                                                                                                                            | 保留本地精简；采纳上游新增的「导出日志」，不显示上游新增的「报告安全问题」                                                        |
+| 结构性               | `WorkspaceShellLayout` / `App.tsx` / `ModelProviderSection` / `WorkspaceSidebar*`                                                                        | 保留本地改动，采纳上游新增（手机远控壳、营销导航、`webRemoteControlFeatureEnabled` 等）                                           |
+| 结构性               | `package.json` / `knip.json` / `.gitignore` / `NOTICE.md`                                                                                                | 保留本地（fork 版本号、vendor 排除、机器产物忽略、更新流程描述），采纳上游新增条目                                                |
+| 上游新增源码里的路径 | 22 个文件、205 处 `.zcode`                                                                                                                               | 按 2.2 规则改名（含上游新增的 `wdio.conf.ts` E2E 配置）；`*-plugin/` 官方载荷文档与 `docs/` 设计文档按 2.2.2 保持原样             |
+
+**上游带来的新依赖（必须 `pnpm install`，本次因断网未装）**：`vitest`（含
+`@vitest/coverage-v8` 等）、`@modelcontextprotocol/ext-apps`、`lottie-web`、`elkjs`、
+`@wdio/electron-types`、`@wdio/globals`、`mocha`、以及上游升级的 `oxfmt`。装好后要重算：
+`pnpm typecheck` 基线、fmt 基线（旧二进制口径下 2463 个「不干净」，不可信）、
+`pnpm test:unit` 的失败集。
+
+**本次复核出的异常（已写入第三节）**：`pnpm fmt:check` 变成会格式化全仓的脚本；上游 vitest 会
+收集我们的 `node:test` 文件（待转 vitest）；上游新测试大量断言上游字面量，在本 fork 必然失败；
+`pnpm typecheck` 清单变长需要新依赖；解冲突时踩到「hunk 拼接出重复声明」「上游新代码消费了我们
+删掉的 state 字段」「忘了带上游新增的 export / 改名」三类错。
+
+**上游开源内置插件源码，2.6 的入库载荷整体失效（重要，未处理）**：v3.15.1 把 12 个插件的源码
+全部随仓库发布，`stageVendoredOfficialPlugins` 现在对每个 vendor 目录都走「源码优先」分支，
+实测 `staged: []` / `skipped: 14`。dev 与打包链各自都不依赖它（dev 走
+`apps/zcode-cli/packages/cli/dist/zcode.cjs` 入口 + 定义表 `../../<name>-plugin` 候选从源码 seed；
+打包链由 `prepare-agent-node-bundle.mjs` 的 `stageOfficialPlugins()` 按源码 stage）。
+即：**本地定制没有丢功能，但 61MB 载荷与相关排除配置已成为死重量**，可按 2.6「2026-10-12 复核」
+列的清单整体清理，
+需用户拍板后再做（连带可消除官方预编译资产的对外分发许可风险）。
+
+**合并后自查结果：** 第六节两条 grep 干净；`pnpm lint` 62 警告 0 错误；
+`pnpm architecture:check --changed` 0 违规；范围化 typecheck 仅剩环境类缺模块错误；
+主进程 `tsconfig.main.json` 86 → **92**、渲染进程 125/126 → **161**，新增部分逐行比对确认全部落在
+**上游逐字代码**里（本地定制文件未新增）；自有单测 21 个全过。
 
 ## 八、注意事项
 

@@ -80,13 +80,14 @@ export const OFFICIAL_CUA_REQUIRED_SEED_PATHS = [
 // zcode-guide 原本没有 requiredSeedPaths，seed 丢文件时会静默装出一个
 // 没有 /workflow 命令的插件——症状是命令不存在，没有任何诊断。技能正文都钉住。
 //
-// 0.3.0 起载荷重组（本地定制：本仓库入库的是官方 3.14.3 带的 0.3.0 载荷，见
-// docs/upstream-merge-notes.md 2.6）：/workflow 命令与 dynamic-workflows 技能已移到
-// bundled-skills（由 prepare-agent-node-bundle.mjs 的 bundledSkillPack 单独校验），
-// 本插件的内容就是下面 6 篇技能正文。原先按 0.2.0 钉的 commands/workflow.md 与
-// skills/dynamic-workflows/* 在 0.3.0 载荷里根本不存在，会让 seed 以
-// ZCODE_PLUGIN_SEED_INCOMPLETE 跳过**整个**插件——指南与全部诊断技能一起装不上，
+// 0.3.0 起载荷重组（见 docs/upstream-merge-notes.md 2.6）：/workflow 命令与
+// dynamic-workflows 技能已移到 bundled-skills（由 prepare-agent-node-bundle.mjs 的
+// bundledSkillPack 单独校验），本插件的内容就是下面 6 篇技能正文。原先按 0.2.0 钉的
+// commands/workflow.md 与 skills/dynamic-workflows/* 在 0.3.0 载荷里根本不存在，会让 seed
+// 以 ZCODE_PLUGIN_SEED_INCOMPLETE 跳过**整个**插件——指南与全部诊断技能一起装不上，
 // 而其余插件不受影响，所以只在日志里表现为一条告警。
+// 上游 v3.15.1 起该插件源码随仓库发布（apps/zcode-cli/packages/zcode-guide-plugin，同为
+// 0.3.0），这 6 条路径在源码与本地入库载荷里都存在，不需要再跟着官方 app 对齐。
 export const OFFICIAL_ZCODE_GUIDE_REQUIRED_SEED_PATHS = [
   "skills/zcode-configuration-guide/SKILL.md",
   "skills/diagnosing-commands/SKILL.md",

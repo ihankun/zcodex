@@ -83,12 +83,12 @@ export function WorkspaceHelpMenuButton({
         align="end"
         className="min-w-0 w-max [&_[data-slot=dropdown-menu-item]]:pr-6"
       >
-        {/* Windows/Linux 没有原生菜单栏，自绘标题栏箭头菜单也已下线，
-            资源管理器只能从这里进。 */}
         <DropdownMenuItem onSelect={helpMenuActions.exportLogs}>
           <DownloadIcon className="size-4" />
           {intl.formatMessage({ id: "titleBar.menu.help.exportLogs" })}
         </DropdownMenuItem>
+        {/* Windows/Linux 没有原生菜单栏，自绘标题栏箭头菜单也已下线，
+            资源管理器只能从这里进。 */}
         <DropdownMenuItem
           data-testid={TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER}
           onSelect={handleOpenResourceManager}

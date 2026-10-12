@@ -147,16 +147,12 @@ export function useWorkspaceSidebarFooterUsageSummaryState({
     // footer badge 和升级入口都需要识别 Team Plan。
     // Team 项目上下文只在企业 pricing/customerInfo 返回，账号级头像徽标也不能被当前连接方式卡住。
     enabled:
-      enabled &&
-      !providerSourcesLoading &&
-      bigmodelFamilyAllowed &&
-      Boolean(bigmodelTeamProvider),
+      enabled && !providerSourcesLoading && bigmodelFamilyAllowed && Boolean(bigmodelTeamProvider),
     authenticated: true,
     family: "bigmodel",
   });
   const zaiEnterpriseProducts = useEnterpriseCodingPlanProducts({
-    enabled:
-      enabled && !providerSourcesLoading && zaiFamilyAllowed && Boolean(zaiTeamProvider),
+    enabled: enabled && !providerSourcesLoading && zaiFamilyAllowed && Boolean(zaiTeamProvider),
     authenticated: true,
     family: "zai",
   });
@@ -383,8 +379,6 @@ export function useWorkspaceSidebarFooterUsageSummaryState({
     currentUsageSource?.providerId ??
     availableCodingPlanProviders[0]?.providerId ??
     resolveSidebarCodingPlanUpgradeFallbackProviderId(providerFamilyDomain);
-  // 本地定制：菜单里的「升级」入口已移除（见 docs/upstream-merge-notes.md 2.3.8），
-  // 原先为它计算的 upgradeTargetProviderId / selectedUpgradeProviderId 随之删除。
   return {
     audience: currentUsageSource?.audience,
     availableCodingPlanProviders,
