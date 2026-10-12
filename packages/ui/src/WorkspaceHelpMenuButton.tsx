@@ -3,7 +3,7 @@ import {
   TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER,
   TID_WORKSPACE_HELP_MENU_TRIGGER,
 } from "@zcode/shared";
-import { ActivityIcon, CircleHelpIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
+import { ActivityIcon, CircleHelpIcon, DownloadIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge.js";
 import { Button } from "@/components/ui/button.js";
 import {
@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/dropdown-menu.js";
 import { cn } from "@/components/lib/utils.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
+import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import { useDesktopUpdateMenu } from "@/hooks/useDesktopUpdateMenu.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
+import { createHelpMenuActionHandlers } from "@/lib/helpMenuActions.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
 export function WorkspaceHelpMenuButton({
@@ -32,6 +34,12 @@ export function WorkspaceHelpMenuButton({
   const { intl } = useZCodeIntl();
   const platform = usePlatform();
   const updateMenu = useDesktopUpdateMenu(isDesktop);
+  const openFeedbackSubmit = useFeedbackStore((state) => state.openSubmit);
+  const helpMenuActions = createHelpMenuActionHandlers({
+    platform,
+    intl,
+    openSubmit: openFeedbackSubmit,
+  });
   const helpMenuLabel = intl.formatMessage({ id: "workspaceHeader.help.menu" });
   const handleOpenResourceManager = () => {
     void platform.executeDesktopCommand(DesktopCommandIds.OpenResourceManager);
@@ -42,10 +50,10 @@ export function WorkspaceHelpMenuButton({
   };
 
   // 本地定制：产品文档 / 用户社群 / 问题上报 / 给产品提需求 四项已从菜单移除
-  // （它们都指向上游的产品服务入口）。剩下的三项都是桌面专属——Web 没有资源管理器、
-  // 桌面更新与关于面板——所以 Web 上不再渲染这个按钮，否则会留下一个点开是空的菜单。
-  // 相应的 `lib/helpMenuActions.ts` 因此不再有调用方，按本 fork 的合并策略保留为不可达代码
-  // （与 forceUpdateGuard 同理：留着与上游逐字节一致，删除会让上游每次改动都产生 delete/modify 冲突）。
+  // （它们都指向上游的产品服务入口）；上游新增的「报告安全问题」同样不显示。
+  // 剩下的都是桌面专属——Web 没有资源管理器、桌面更新与关于面板——所以 Web 上不渲染这个按钮，
+  // 否则会留下一个点开是空的菜单。
+  // 注意 `lib/helpMenuActions.ts` **仍在用**（上游新增的「导出日志」项走它），不是死代码。
   if (!isDesktop) {
     return null;
   }
@@ -77,6 +85,10 @@ export function WorkspaceHelpMenuButton({
       >
         {/* Windows/Linux 没有原生菜单栏，自绘标题栏箭头菜单也已下线，
             资源管理器只能从这里进。 */}
+        <DropdownMenuItem onSelect={helpMenuActions.exportLogs}>
+          <DownloadIcon className="size-4" />
+          {intl.formatMessage({ id: "titleBar.menu.help.exportLogs" })}
+        </DropdownMenuItem>
         <DropdownMenuItem
           data-testid={TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER}
           onSelect={handleOpenResourceManager}

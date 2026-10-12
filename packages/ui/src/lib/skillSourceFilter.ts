@@ -2,7 +2,7 @@ import type { ZCodeProvider } from "@zcode/shared";
 
 type SkillSourceType = "glm" | "unknown";
 
-function resolveSkillSourceType(skillPath: string): SkillSourceType {
+export function resolveSkillSourceType(skillPath: string): SkillSourceType {
   const normalized = skillPath.replaceAll("\\", "/").toLowerCase();
   // 用户级（~/.zcodex/skills）与项目级（<项目>/.zcodex/skills）同名，一条匹配即覆盖两者；
   // CLI 插件缓存在 ~/.zcodex/cli 下，是另一处来源，单独匹配。

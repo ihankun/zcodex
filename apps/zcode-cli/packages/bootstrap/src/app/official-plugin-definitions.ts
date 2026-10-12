@@ -18,7 +18,7 @@ export interface OfficialPluginListingSeed {
   examplePrompts_i18n?: Record<string, string[]>;
 }
 
-const OFFICIAL_BROWSER_USE_PLUGIN_NAME = "browser-use";
+export const OFFICIAL_BROWSER_USE_PLUGIN_NAME = "browser-use";
 export const OFFICIAL_BROWSER_USE_PLUGIN_ID = `${OFFICIAL_BROWSER_USE_PLUGIN_NAME}@${ZCODE_OFFICIAL_PLUGIN_MARKETPLACE}`;
 /**
  * node_repl 宿主。它不是面向用户的插件：没有 skill、没有 listing、不进市场，唯一职责是
@@ -31,7 +31,7 @@ export const OFFICIAL_BROWSER_USE_PLUGIN_ID = `${OFFICIAL_BROWSER_USE_PLUGIN_NAM
  */
 export const OFFICIAL_NODE_REPL_HOST_PLUGIN_NAME = "node-repl-host";
 export const OFFICIAL_NODE_REPL_HOST_PLUGIN_ID = `${OFFICIAL_NODE_REPL_HOST_PLUGIN_NAME}@${ZCODE_OFFICIAL_PLUGIN_MARKETPLACE}`;
-const OFFICIAL_CUA_PLUGIN_NAME = "computer-use";
+export const OFFICIAL_CUA_PLUGIN_NAME = "computer-use";
 export const OFFICIAL_CUA_PLUGIN_ID = `${OFFICIAL_CUA_PLUGIN_NAME}@${ZCODE_OFFICIAL_PLUGIN_MARKETPLACE}`;
 
 export interface OfficialPluginDefinition {
@@ -57,7 +57,7 @@ export interface OfficialPluginDefinition {
 const ZAI_AUTHOR = { name: "Z.ai", url: "https://z.ai" } as const;
 const OFFICIAL_PLUGIN_ASSETS_BASE_URL = "https://cdn-zcode.z.ai/zcode/official-plugin/assets";
 
-const OFFICIAL_NODE_REPL_HOST_REQUIRED_SEED_PATHS = ["dist/mcp/server.js"] as const;
+export const OFFICIAL_NODE_REPL_HOST_REQUIRED_SEED_PATHS = ["dist/mcp/server.js"] as const;
 
 export const OFFICIAL_BROWSER_USE_REQUIRED_SEED_PATHS = [
   "docs/api.json",
@@ -71,7 +71,7 @@ export const OFFICIAL_BROWSER_USE_REQUIRED_SEED_PATHS = [
   "skills/web-gui-tester/SKILL.md",
 ] as const;
 
-const OFFICIAL_CUA_REQUIRED_SEED_PATHS = [
+export const OFFICIAL_CUA_REQUIRED_SEED_PATHS = [
   "docs/computer-use.md",
   "scripts/computer-use-client.mjs",
   "skills/computer-use/SKILL.md",
@@ -87,7 +87,7 @@ const OFFICIAL_CUA_REQUIRED_SEED_PATHS = [
 // skills/dynamic-workflows/* 在 0.3.0 载荷里根本不存在，会让 seed 以
 // ZCODE_PLUGIN_SEED_INCOMPLETE 跳过**整个**插件——指南与全部诊断技能一起装不上，
 // 而其余插件不受影响，所以只在日志里表现为一条告警。
-const OFFICIAL_ZCODE_GUIDE_REQUIRED_SEED_PATHS = [
+export const OFFICIAL_ZCODE_GUIDE_REQUIRED_SEED_PATHS = [
   "skills/zcode-configuration-guide/SKILL.md",
   "skills/diagnosing-commands/SKILL.md",
   "skills/diagnosing-hooks/SKILL.md",
@@ -97,6 +97,50 @@ const OFFICIAL_ZCODE_GUIDE_REQUIRED_SEED_PATHS = [
 ] as const;
 
 export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = [
+  {
+    defaultEnabled: true,
+    listing: {
+      author: ZAI_AUTHOR,
+      category: "productivity",
+      displayName: "Visualize",
+      displayName_i18n: { "zh-CN": "交互视图" },
+      description_i18n: { "zh-CN": "在对话中创建交互图表、解释和设计预览。" },
+    },
+    name: "visualize",
+    requiredSeedPaths: [
+      "skills/visualize/SKILL.md",
+      "skills/visualize/references/api.md",
+      "skills/visualize/references/styles.md",
+      "skills/visualize/tweak.md",
+      "skills/visualize/LICENSE.md",
+      "skills/visualize/scripts/render.py",
+      "skills/visualize/assets/visualize.css",
+      "skills/visualize/assets/visualize.html",
+      "skills/visualize/assets/calendar.js",
+      "skills/visualize/assets/runtime-manifest.json",
+      "skills/visualize/scripts/vendor.py",
+      "skills/visualize/assets/vendor/manifest.json",
+      "skills/visualize/assets/vendor/floating-ui-core-1.7.3.min.js",
+      "skills/visualize/assets/vendor/floating-ui-core-1.7.3.min.js.LICENSE",
+      "skills/visualize/assets/vendor/floating-ui-dom-1.7.4.min.js",
+      "skills/visualize/assets/vendor/floating-ui-dom-1.7.4.min.js.LICENSE",
+      "skills/visualize/assets/vendor/lucide-1.17.0.js",
+      "skills/visualize/assets/vendor/lucide-1.17.0.js.LICENSE",
+      "skills/visualize/assets/vendor/d3-7.9.0.min.js",
+      "skills/visualize/assets/vendor/d3-7.9.0.min.js.LICENSE",
+      "skills/visualize/widgets/calendar.md",
+      "skills/visualize/examples/calendar.html",
+      "skills/visualize/assets/standalone-host-bridge.js",
+      "skills/visualize/assets/standalone-shell.js",
+    ],
+    rootCandidates: [
+      "packages/visualize-plugin",
+      "../visualize-plugin",
+      "../../visualize-plugin",
+      "../../../visualize-plugin",
+    ],
+    version: "0.1.0",
+  },
   {
     // 无 listing：宿主不进市场、不对用户露出。它必须始终可用，因为 node_repl 的注册门禁
     // 是「Browser Use 或 Computer Use 任一启用」，宿主自己不参与那个判断。
@@ -113,7 +157,7 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       "../../node-repl-host",
       "../../../node-repl-host",
     ],
-    version: "0.6.0",
+    version: "0.6.1",
   },
   {
     listing: {
@@ -189,7 +233,7 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
         `../../${name}-plugin`,
         `../../../${name}-plugin`,
       ],
-      version: "0.1.7",
+      version: "0.1.8",
     }),
   ),
   {
@@ -365,11 +409,13 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
       "../../../zcode-cua-plugin",
     ],
     requiredSeedPaths: OFFICIAL_CUA_REQUIRED_SEED_PATHS,
-    // 当前 CUA 为不可用占位包，无需复制 native runtime；避免把本地旧依赖继续带入缓存。
-    runtimeTopLevelPaths: [],
+    // Bug 根因：迁移 node_repl 时把旧 MCP launcher 与 SDK 仍需的 Sharp runtime 一并裁掉了。
+    // Dev/desktop 会把最小 Sharp 闭包 stage 到这里；官方 cache 必须继续携带 node_modules，
+    // 否则 seed 原子替换后首次截图才会报 Cannot find module 'sharp'。
+    runtimeTopLevelPaths: ["node_modules"],
     // 这里的 version 追踪上游 zcode-cua runtime 版本，使插件 UI 展示、缓存路径、
     // marketplace 条目都对齐；具体版本由原子 producer bump 工作流维护。
-    version: "0.6.3",
+    version: "0.6.4",
   },
 ];
 
