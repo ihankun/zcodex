@@ -700,6 +700,20 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
   `../../<name>-plugin` 候选从**源码树**解析，**dev 根本不看 `bundled-agents/<平台>/glm/packages/`**；
   打包链才由 `prepare-agent-node-bundle.mjs` 的 `stageOfficialPlugins()` 按源码 stage 到 `glm/packages`。
   2026-10-12 曾因「vendor 载荷全被跳过」误判成 dev 要丢插件，白查一轮——详见 2.6。
+- **Gen UI 运行时资源在 Windows 上必须是 LF，`.gitattributes` 里那两条规则不能删（2026-10-13 实测）。**
+  `apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/**` 与
+  `packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js` 按**原始字节** sha256 校验：
+  前者由 `packages/desktop/scripts/gen-ui-runtime-assets.mjs` 比对 `vendor/manifest.json`、
+  `gen-ui-runtime-assets.test.ts` 比对 `runtime-manifest.json`（它的 `tweak.js` 一项指向上面的
+  `genUiTweakRuntime.js`）。本机 `core.autocrlf=true` 时检出会写成 CRLF，12 个哈希全部失配，表现是
+  **打包在 tsup 阶段中断**：`Error: Gen UI vendor hash mismatch: floating-ui-core-1.7.3.min.js`
+  → `pnpm exec tsup failed with code 1` → `[bundle] pnpm build failed with code 1`，
+  electron-builder 根本不启动（`dist/` 里仍是上一版产物，容易误判成「打包成功但没出 exe」）。
+  这批快照与校验随上游 v3.15.1 进来，所以 v3.15.1 之后第一次在 Windows 打包才暴露；mac/Linux
+  （autocrlf=false）从未受影响。
+  **处理方式是恢复 LF 字节，不要改校验、也不要给这些文件跑格式化**：`rm -rf <路径>` 后
+  `git -c core.autocrlf=false checkout -- <路径>`（`.oxfmtrc.json` 的 ignorePatterns 已覆盖该目录）。
+  自查：`pnpm test:unit` 现在会跑上面两条用例（2026-10-13 加入 include），失配会在单测阶段而非打包阶段报出来。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
@@ -813,6 +827,13 @@ node_modules/.bin/vitest run \
 #      `zcode-renderer-main`。只把标题单边改回 `ZCode`（或只改一处）就会红。
 #    services/test/providerBalanceNormalize.test.ts、ui/test/providerBalancePresentation.test.ts
 #      钉的是 2.9 余量查询的归一化与展示规则。
+
+# ⑥ Gen UI 运行时资源必须保持 LF（它是字节级 sha256 校验的输入，见「三」的踩坑记录）
+#    2026-10-13 起这两条用例已进 `test:unit` 默认入口，全量单测就会拦住换行漂移。
+node_modules/.bin/vitest run --project unit \
+  packages/desktop/scripts/gen-ui-runtime-assets.test.ts \
+  packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.test.ts
+# 期望：3 passed。命中 CRLF 时的现场是打包在 tsup 阶段报 Gen UI vendor hash mismatch。
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
