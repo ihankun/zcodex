@@ -180,7 +180,8 @@
 
 - `packages/ui/src/settings/model-provider-section/Detail.tsx` — `if (!selectedNavItem)` 分支改为：`presetLoading` 为 true（仍在加载）时显示加载卡片，否则显示空状态引导（不再一直停留在「加载中」）。
 - `packages/ui/src/settings/model-provider-section/StatusCards.tsx` — 新增 `ModelProviderEmptyGuideCard`。
-- `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts` — 新增 `settings.modelProvider.emptyGuide` 文案。
+- `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts` — 新增 `settings.modelProvider.emptyGuide` 文案
+  （fork 独有，合并后按第六节 ⑥ 确认还在）。
 
 #### 2.3.5 隐藏未登录的智谱品牌入口（2026-09-29）
 
@@ -335,7 +336,7 @@ Web 上否则会剩一个点开是空的菜单）。
 | `packages/ui/src/UpdateStatusDialog.tsx`、`UpdateStatusDialogController.tsx`、`UpdateStatusButton.tsx`、`updateStatusModel.ts` | 更新窗口按 `manualInstaller` 显示「安装并重启 / 打开安装包 / 显示安装包」，并渲染更新说明                                                                                                                                                                                                                                                   |
 | `packages/ui/src/lib/desktopUpdateMenu.ts`                                                                                     | 桌面菜单里的手动更新入口                                                                                                                                                                                                                                                                                                                    |
 | `packages/ui/src/root/useRootPlatformEffects.ts`                                                                               | 新增 `manual-ready` 的 toast 分支                                                                                                                                                                                                                                                                                                           |
-| `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts`                                                                            | 新增 `updateDialog.*` / `updateReady.*` / `update.toast.manualReady` 文案                                                                                                                                                                                                                                                                   |
+| `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts`                                                                            | 新增 `updateDialog.*` / `updateReady.*` / `update.toast.manualReady` 文案（fork 独有，合并后按第六节 ⑥ 确认还在）                                                                                                                                                                                                                           |
 | `packages/web/src/main.tsx`                                                                                                    | Web 平台实现把这两个方法 stub 成 resolved（Web 没有桌面更新）                                                                                                                                                                                                                                                                               |
 | `README.md`、`NOTICE.md`、根 `package.json`                                                                                    | 发布流程说明、网络行为描述、`publish:github` 脚本入口                                                                                                                                                                                                                                                                                       |
 
@@ -562,8 +563,11 @@ DeepSeek 金额余额（含赠金/充值分项）与 OpenCode Go 的 5h / 1w / 1
   新增 `providerBalance` 段，与 GLM 的 Start Plan / Coding Plan 段并列且互斥；
   hover 刷新复用既有 `onAccess` 链路（60s access 窗口 + in-flight 合并）。
 - `packages/ui/src/settings/model-provider-section/Detail.tsx`：通用 provider 分支多渲染一个余量区块。
-- `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`：`settings.modelProvider.providerBalance.*` 13 条
-  与 `planCard.usage.month`。
+- `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`：`settings.modelProvider.providerBalance.*` **11 条**
+  与 `planCard.usage.month`（2026-10-14 更正：此前记的「13 条」有误）。这些是 **fork 独有的 key**，
+  合并上游时**不能整取上游 locale 文件**——v3.15.1 合并整取上游时把这一组删了，界面直接显示
+  `settings.modelProvider.providerBalance.title` 这类 raw id；排查与自查见第三节、第六节 ⑥，
+  丢失与恢复记录见第七节 2026-10-14 补记。
 - 单测：`packages/services/test/providerBalanceNormalize.test.ts`、
   `packages/ui/test/providerBalancePresentation.test.ts`（合并上游后要一起跑）。
 
@@ -700,6 +704,24 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
   `../../<name>-plugin` 候选从**源码树**解析，**dev 根本不看 `bundled-agents/<平台>/glm/packages/`**；
   打包链才由 `prepare-agent-node-bundle.mjs` 的 `stageOfficialPlugins()` 按源码 stage 到 `glm/packages`。
   2026-10-12 曾因「vendor 载荷全被跳过」误判成 dev 要丢插件，白查一轮——详见 2.6。
+- **`packages/ui/src/i18n/locales/{zh-CN,en-US}.ts` 不能「取上游版本 + 重施改名」——fork 独有的 key 会静默消失（2026-10-13 发现，2026-10-14 修复）。**
+  这两张表是平铺的 `Record<string, string>`：编译器不做 key 校验，`intl.formatMessage` 找不到 key 时
+  **把 id 原样渲染**，`lint` / `architecture:check` / 单测都不覆盖，所以合并自查能全绿而界面一片 raw id
+  ——v3.15.1 合并后的模型设置余量面板（显示成 `settings.modelProvider.providerBalance.title` 等）就是
+  这么被发现的。整取上游一共丢了 **31 条**：25 条 fork 新增（余量面板 12 + 手动更新链路 9 +
+  `desktopMenu.help.*` 3 + `emptyGuide`）**已全部按原样恢复**；6 条是上游 v3.15.1 自己删的
+  （5 条 `chat.*` 上限文案 + `providerBusiness.3007`），**不要恢复**，见第七节 2026-10-14 补记。
+  三个必须知道的细节：
+  - `zcode.error.providerBusiness.3007` **不是丢的**：上游把它搬进了
+    `packages/ui/src/request-security-edition/messages.ts`（locale 末尾 `...requestSecurityMessages*`
+    spread 进来）。盲目补回会撞 `TS2783`（重复 key）——「搬家」这类变更反而 typecheck 能抓住。
+    该兜底表**按语言分块且两块不对称**（zh 只有 3007，en 还多一条 `modelSuspiciousEmpty`），
+    做 key 覆盖检查必须按语言分别并入有效 key 空间，否则会误报。
+  - 多行文案（键与值分行的写法，en-US 里很多）删/补都要**整块**处理：本次先删了键行、留下孤儿值行，
+    靠 `pnpm typecheck` 的 `TS1005` 才暴露。
+  - **不要用 `grep -oE '^\s*"[^"]+":'` 之类的正则提 key**（BSD grep 的 `-o` 在该模式上会漏匹配，
+    本次两次得出错误结论）；同理 `comm` 必须 `LC_ALL=C sort` 且两侧一致，否则大量假阳性。
+    用第六节 ⑥ 的 `pnpm i18n:check`。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
@@ -721,19 +743,20 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
 
 ## 五、合并冲突决策表
 
-| 冲突场景                                                                                         | 处理方式                                                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 上游改动第二节所列文件的**非路径行**                                                             | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                                              |
-| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`） | 采用上游后手动改为 `.zcodex`                                                                                                                                                |
-| 上游新增/修改 **user vs workspace** 目录 segments                                                | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                                                  |
-| 上游改 productName / 应用名相关                                                                  | 保留本地 `ZCodex` 命名                                                                                                                                                      |
-| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                     | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                               |
-| 上游改品牌文案（i18n、提示词、菜单）                                                             | 直接采用上游                                                                                                                                                                |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                   | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                      |
-| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）       | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                             |
-| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                      | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                |
-| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                     | 对照 2.6。**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**（本 fork 加固版），其余条目可直接采用上游；`stage-agent-bundle.mjs` 现已与上游逐字节一致 |
-| 上游新增数据目录子目录（v2 下新文件等）                                                          | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                                               |
+| 冲突场景                                                                                         | 处理方式                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 上游改动第二节所列文件的**非路径行**                                                             | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                                                   |
+| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`） | 采用上游后手动改为 `.zcodex`                                                                                                                                                     |
+| 上游新增/修改 **user vs workspace** 目录 segments                                                | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                                                       |
+| 上游改 productName / 应用名相关                                                                  | 保留本地 `ZCodex` 命名                                                                                                                                                           |
+| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                     | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                                    |
+| 上游改品牌文案（提示词、原生菜单）                                                               | 直接采用上游                                                                                                                                                                     |
+| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                       | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑥）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节） |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                   | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                           |
+| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）       | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                                  |
+| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                      | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                     |
+| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                     | 对照 2.6。**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**（本 fork 加固版），其余条目可直接采用上游；`stage-agent-bundle.mjs` 现已与上游逐字节一致      |
+| 上游新增数据目录子目录（v2 下新文件等）                                                          | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                                                    |
 
 ## 六、合并后自查命令
 
@@ -813,6 +836,19 @@ node_modules/.bin/vitest run \
 #      `zcode-renderer-main`。只把标题单边改回 `ZCode`（或只改一处）就会红。
 #    services/test/providerBalanceNormalize.test.ts、ui/test/providerBalancePresentation.test.ts
 #      钉的是 2.9 余量查询的归一化与展示规则。
+#      注意它与 ⑥ 的分工：这两条钉的是「展示规则返回哪个 key」，⑥ 钉的是「那个 key 在两个
+#      locale 里真的存在」——v3.15.1 合并后的余量 raw id 事故里，单测全绿而界面是坏的。
+
+# ⑥ i18n key 覆盖（合并整取上游 locale 时的静默丢失口，见第三节）
+#    ① 代码里 `id: "xxx.yyy"` 的引用必须在两个 locale（含 request-security-edition 兜底表）里
+#      存在；② 传 --baseline 时列出「基线有、现在没有」的 key，逐条判断 fork 新增（必须补回）
+#      还是上游删除（忽略，如 v3.15.1 删掉的 5 条 chat.* 上限文案）。
+pnpm i18n:check
+pnpm i18n:check -- --baseline <合并前的 dev tip>
+# 基线（2026-10-14 实测）：① 2786 个 id 全部可解析；② 相对 v3.15.1 合并前的 b3484690，
+#   zh 剩 6 条 / en 剩 7 条且全部已知：5 条上游删除的 chat.* 上限文案 + providerBusiness.3007
+#   （已搬进 security-edition 表）+ en 侧的 modelSuspiciousEmpty（上游只在 en 的兜底表里给）。
+#   新增任何一条都要能解释来源，别默默接受。
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
@@ -922,6 +958,29 @@ ios/android 模拟器 README、`bundled-skills` README 与 dynamic-workflows 示
 主进程 `tsconfig.main.json` 86 → **84**、渲染进程 125/126 → **154**（装依赖后比合并当天的 92/161 又降了
 8/7 个，新增部分逐行比对确认全部落在**上游逐字代码**里）；自有单测 21 个在 vitest 下全过；
 `pnpm test:unit` 89 个文件失败，全部可归因到上游字面量或我们有意删改的功能。
+
+### 2026-10-14 v3.15.1 合并补记：i18n key 静默丢失的定位与恢复
+
+**现象**：模型设置 → DeepSeek 供应商的余量区块直接显示
+`settings.modelProvider.providerBalance.title` / `.query` / `.idle` 三个 raw id（功能正常，文案缺失）。
+
+**根因**：合并提交 `147ce14b` 按「纯字面量改名 → 取上游版本 + 重施改名」处理
+`packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`，整取上游即删掉 fork 独有的 key；两张表是
+`Record<string, string>`，`typecheck` / `lint` / 架构检查 / 单测都查不出，只在界面上可见（详见第三节）。
+
+**范围与处理**：丢失 31 条 = **25 条 fork 新增**（余量面板 12 + 手动更新链路 9 + `desktopMenu.help.*` 3 +
+`emptyGuide`）**已按合并前原文整块恢复**（含多行值，插入位置沿用合并前的分组位置）+ **6 条上游
+v3.15.1 自己删除的**（5 条 `chat.*` 上限文案 + `providerBusiness.3007`，后者被上游搬进
+`request-security-edition/messages.ts`；一律不恢复）。同时更正 2.9 的「13 条」为 11 条。
+
+**新增工具**：`scripts/check-i18n-locale-keys.mjs`（`pnpm i18n:check`）——① 代码引用 id 覆盖检查、
+② `--baseline <rev>` 的 key 集合比对；已挂进第六节 ⑥，并在第五节决策表加了一行。
+
+**验证（2026-10-14 实测）**：`pnpm typecheck` exit 0（期间靠它抓出恢复时留下的 `TS2783` 重复 key 与
+`TS1005` 孤儿值行各一次）；`pnpm lint` 62 警告 / 0 错误；`pnpm architecture:check --changed` 0 违规；
+4 个自有测试文件 21 用例全过；`pnpm i18n:check` ① 2786 个 id 全部可解析、② 只剩上述已知项；
+两个 locale 文件与 HEAD 版本的 `oxfmt --check` 结论逐行一致（en-US 的 6 处格式差异是上游继承，
+不是本次引入——判定用**仓库内同目录副本**，别用 /tmp，见第三节）。
 
 ## 八、注意事项
 

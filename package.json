@@ -61,6 +61,7 @@
     "publish:github": "node packages/desktop/scripts/publish-github-release.mjs",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
+    "i18n:check": "node scripts/check-i18n-locale-keys.mjs",
     "knip": "knip",
     "count-lines": "bash scripts/count-lines.sh",
     "prepare:remote-assets": "pnpm --filter @zcode/desktop prepare:remote-assets",
