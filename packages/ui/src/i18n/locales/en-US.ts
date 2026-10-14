@@ -1752,6 +1752,9 @@ const enUS: Record<string, string> = {
   "updateReady.title": "Update v{version}",
   "updateReady.releaseNotesTitle": "v{version} Release Notes",
   "updateReady.tooltip": "v{version} ready, click to restart and update",
+  "updateReady.manualTooltip":
+    "Installer for v{version} is downloaded. Click to install and restart.",
+  "updateReady.manualOpenTooltip": "Installer for v{version} is downloaded. Click to open it.",
   "updateAvailable.tooltip": "New version v{version} is available. Click to review.",
   "updateReady.confirm.title": "Update to v{version}?",
   "updateReady.confirm.description":
@@ -1765,6 +1768,14 @@ const enUS: Record<string, string> = {
   "updateDialog.releaseNotesExpand": "Show",
   "updateDialog.releaseNotesCollapse": "Hide",
   "updateDialog.downloadAndUpdate": "Download update",
+  "updateDialog.downloadInstaller": "Download installer",
+  "updateDialog.openInstaller": "Open installer",
+  "updateDialog.installAndRestart": "Install and restart",
+  "updateDialog.showInstaller": "Show installer",
+  "updateDialog.manualInstallerAutoHint":
+    "{fileName} is downloaded. Choosing Install and restart quits the app, replaces the installed copy and reopens it automatically.",
+  "updateDialog.manualInstallerReadyHint":
+    "{fileName} is in your Downloads folder. Drag it into Applications to replace the old version, then reopen the app.",
   "updateDialog.cancelDownload": "Cancel download",
   "updateDialog.autoDownloadAndInstall": "Automatically download and install updates next time",
   "updateDialog.downloadingAction": "Downloading",
@@ -1777,6 +1788,8 @@ const enUS: Record<string, string> = {
   "update.toast.downloading": "Downloading new version v{version}",
   "update.toast.alreadyDownloading": "Downloading new version ({progress}%)",
   "update.toast.ready": "v{version} downloaded, restart to install",
+  "update.toast.manualReady":
+    "Installer for v{version} is downloaded. Choose Install and restart to update.",
   "update.toast.devSkipped": "Updates are disabled in dev builds",
   "update.toast.error": "Update check failed: {error}",
   "forceUpdate.title": "Update ZCodex to continue",
@@ -1791,6 +1804,9 @@ const enUS: Record<string, string> = {
   "desktopMenu.help.updateAvailableVersion": "Update available {version}",
   "desktopMenu.help.downloadingUpdateVersion": "Downloading update {version}...",
   "desktopMenu.help.downloadingUpdateProgress": "Downloading update... {progress}",
+  "desktopMenu.help.downloadUpdateManually": "Download update ({version})",
+  "desktopMenu.help.openDownloadedInstaller": "Open installer ({version})",
+  "desktopMenu.help.installAndRestart": "Install and restart ({version})",
   "desktopMenu.help.restartUpdateAction": "Restart to update",
   "desktopMenu.help.restartToUpdate": "Restart to update ({version})",
   "postUpdateReleaseNotes.title": "Release notes",
@@ -3340,6 +3356,19 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.planCard.usage.fiveHour": "5h usage",
   "settings.modelProvider.planCard.usage.week": "1w usage",
   "settings.modelProvider.planCard.usage.totalTokens": "Total tokens",
+  "settings.modelProvider.planCard.usage.month": "1m usage",
+  "settings.modelProvider.providerBalance.title": "{provider} balance",
+  "settings.modelProvider.providerBalance.query": "Query",
+  "settings.modelProvider.providerBalance.idle": "Click Query to fetch the balance",
+  "settings.modelProvider.providerBalance.total": "Balance",
+  "settings.modelProvider.providerBalance.granted": "Granted credit",
+  "settings.modelProvider.providerBalance.toppedUp": "Topped up",
+  "settings.modelProvider.providerBalance.accountUnavailable": "Account currently unavailable",
+  "settings.modelProvider.providerBalance.unavailable.notConfigured": "No API key configured",
+  "settings.modelProvider.providerBalance.unavailable.notAuthenticated": "Invalid API key",
+  "settings.modelProvider.providerBalance.unavailable.noPlan": "OpenCode Go subscription required",
+  "settings.modelProvider.providerBalance.unavailable.generic":
+    "Unable to query the balance right now",
   "settings.modelProvider.codingPlan.recheck": "Recheck",
   "settings.modelProvider.codingPlan.checkingPlans": "Checking...",
   "settings.modelProvider.codingPlan.switchAccount": "Switch account",
@@ -4054,6 +4083,8 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.presetDescription":
     "Built-in Z.ai and BigModel providers with OAuth-assisted configuration.",
   "settings.modelProvider.presetEmpty": "Not synced yet. Complete OAuth login first.",
+  "settings.modelProvider.emptyGuide":
+    'No model provider configured yet. Click "Add provider" to get started.',
   "settings.modelProvider.customTitle": "Custom providers",
   "settings.modelProvider.refresh": "Refresh",
   "settings.modelProvider.reorderProvider": "Drag to reorder provider",
