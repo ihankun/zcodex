@@ -102,6 +102,8 @@ export const modelOptionSpecsDataSchema = z
 export const completeModelConfigDataSchema = z
   .object({
     enabled: z.boolean(),
+    /** 展示叶子：只影响界面上的模型名，不参与请求构造，因此允许缺失。 */
+    displayName: z.string().min(1).optional(),
     properties: completeModelPropertiesDataSchema,
     optionSpecs: completeModelOptionSpecsDataSchema,
   })

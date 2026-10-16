@@ -83,7 +83,8 @@ describe("automation model/thought linkage", () => {
     });
 
     expect(groups.flatMap((group) => group.items.map((item) => item.name))).toEqual([
-      "coding-only-model",
+      // item.name 是显示名（id 仍在 value 里）。
+      "Coding Only Model",
     ]);
   });
 

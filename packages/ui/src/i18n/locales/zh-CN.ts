@@ -3528,6 +3528,8 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.addModel": "添加模型",
   "settings.modelProvider.modelId": "模型 ID",
   "settings.modelProvider.modelDisplayName": "显示名称",
+  "settings.modelProvider.modelDisplayNameHint":
+    "留空则自动匹配名称；显示名只影响界面，请求仍使用模型 ID。",
   "settings.modelProvider.modelApiFormat.anthropic": "Anthropic Messages",
   "settings.modelProvider.modelApiFormat.openaiCompatible": "OpenAI Compatible",
   "settings.modelProvider.modelApiFormat.openaiResponses": "OpenAI Responses",

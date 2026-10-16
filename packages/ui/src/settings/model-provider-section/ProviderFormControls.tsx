@@ -9,6 +9,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useProviderModelDraft } from "@/settings/model-provider-section/useProviderModelDraft.js";
 import { ProviderModelMetadataDialog } from "@/settings/model-provider-section/ProviderModelMetadataDialog.js";
 import { formatModelContextWindowLabel } from "@/lib/tokenNumberFormat.js";
+import { resolveModelDisplayNameForModelId } from "@/lib/modelDisplayName.js";
 import type { ModelConfigResolution, ProviderConfigObject } from "@zcode/provider";
 import { shouldShowModelVisionBadge } from "@/lib/modelVisionBadge.js";
 import { useProviderDetailFeedback } from "@/settings/model-provider-section/ProviderDetailFeedback.js";
@@ -241,17 +242,41 @@ export function ModelRowInput({
     { id: "settings.modelProvider.contextWindowBadgeLabel" },
     { value: contextWindowLabel },
   );
+  // 显示名解析（spec：docs/specs/model-display-name.md）：覆盖 → 对照表 → 推导 → id。
+  // 与 id 相同时保持现状单行渲染，避免给绝大多数未命中的模型增加噪音。
+  const resolvedDisplayName = resolveModelDisplayNameForModelId({
+    modelId: model.modelId,
+    configuredDisplayName: model.config.displayName,
+  });
+  const showsResolvedDisplayName = resolvedDisplayName !== model.modelId;
 
   return (
     <div className="space-y-2 px-3 py-2">
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span
-            data-testid={inputTestId}
-            className="min-w-0 truncate font-mono text-ui-base text-foreground"
-          >
-            {model.modelId}
-          </span>
+          {showsResolvedDisplayName ? (
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span
+                data-model-display-name="true"
+                className="min-w-0 truncate text-ui-base text-foreground"
+              >
+                {resolvedDisplayName}
+              </span>
+              <span
+                data-testid={inputTestId}
+                className="min-w-0 truncate font-mono text-ui-sm text-foreground-subtle"
+              >
+                {model.modelId}
+              </span>
+            </div>
+          ) : (
+            <span
+              data-testid={inputTestId}
+              className="min-w-0 truncate font-mono text-ui-base text-foreground"
+            >
+              {model.modelId}
+            </span>
+          )}
           <span
             className="inline-flex h-5 max-w-20 shrink-0 items-center truncate rounded-md border border-border bg-surface px-1.5 font-mono text-ui-sm text-foreground-subtle"
             aria-label={contextWindowAccessibleLabel}

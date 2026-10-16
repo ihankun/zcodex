@@ -23,6 +23,7 @@ import {
   ProviderModelReasoningSettings,
 } from "@/settings/model-provider-section/ProviderModelSettingsGroups.js";
 import { isImeComposingKeyEvent } from "@/lib/imeComposition.js";
+import { resolveModelDisplayNameForModelId } from "@/lib/modelDisplayName.js";
 import { TECHNICAL_INPUT_ATTRIBUTES } from "@/lib/technicalInputAttributes.js";
 import {
   ProviderModelMetadataDialogActions,
@@ -197,6 +198,28 @@ export function ProviderModelMetadataDialog({
                   onCompositionEnd={handleCompositionEnd}
                   onKeyDown={handleTechnicalInputKeyDown}
                 />
+              </div>
+              <div className="min-w-0 flex-1" data-model-display-name-row="true">
+                <label className="mb-1 block text-ui-base text-foreground-subtle">
+                  {intl.formatMessage({ id: "settings.modelProvider.modelDisplayName" })}
+                </label>
+                <Input
+                  autoComplete="off"
+                  type="text"
+                  size="lg"
+                  className={modelEditorControlStyle(false)}
+                  value={draft.displayNameValue}
+                  placeholder={resolveModelDisplayNameForModelId({ modelId: draft.idValue })}
+                  onChange={(event) => {
+                    onDraftChange({ displayNameValue: event.target.value });
+                  }}
+                  onCompositionStart={handleCompositionStart}
+                  onCompositionEnd={handleCompositionEnd}
+                  onKeyDown={handleTechnicalInputKeyDown}
+                />
+                <p className="mt-1 text-ui-sm text-foreground-subtle">
+                  {intl.formatMessage({ id: "settings.modelProvider.modelDisplayNameHint" })}
+                </p>
               </div>
             </div>
           </ModelSettingsGroup>

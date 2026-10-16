@@ -78,6 +78,8 @@ export function serializeRegistryModelConfig(
 ): RegistryModelConfigObject {
   return {
     enabled: config.enabled,
+    // 展示叶子：仅在存在时写入，避免给下游断言引入 undefined 键。
+    ...(config.displayName === undefined ? {} : { displayName: config.displayName }),
     properties: {
       requiresMfjsToolSchema: config.properties.requiresMfjsToolSchema,
       contextWindow: config.properties.contextWindow,

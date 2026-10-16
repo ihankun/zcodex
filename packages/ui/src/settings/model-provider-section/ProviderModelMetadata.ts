@@ -15,6 +15,8 @@ export interface ProviderModelDraftValues {
   contextWindowValue: string;
   maxOutputTokensValue: string;
   inputFormatValue: ProviderModelInputFormatDraft;
+  /** 显示名覆盖；空串表示不覆盖，回落自动解析（spec：docs/specs/model-display-name.md）。 */
+  displayNameValue: string;
   enabledValue?: boolean;
   useRecommendedConfigValue?: boolean;
   /** 仅在本次 Draft 从固定模式切回推荐模式时清空已有 Overlay。 */
@@ -49,6 +51,7 @@ export function createProviderModelDraftValues(
   const inputFormat = properties?.inputFormat;
   return {
     idValue: model.modelId,
+    displayNameValue: model.personalConfig.displayName ?? "",
     // 编辑器只把 Personal Overlay 当作真实输入；继承值由 UI 作为 placeholder 展示。
     contextWindowValue:
       model.personalConfig.properties?.contextWindow == null
@@ -235,6 +238,11 @@ export function resolveProviderModelDraftCommit({
   if (Object.keys(personalProperties).length === 0)
     deleteMutable(sparsePersonalConfig, "properties");
 
+  // 显示名留空表示不覆盖（回落自动解析），只在个人层写入/移除。
+  const displayName = draft.displayNameValue.trim();
+  if (displayName) assignMutable(sparsePersonalConfig, "displayName", displayName);
+  else deleteMutable(sparsePersonalConfig, "displayName");
+
   const inheritedMaxOption = inherited?.optionSpecs?.maxOutputTokens;
   // Option Spec 不再拥有 default；该输入框唯一表达模型硬上限 max。
   const currentEffectiveMaxOption = {
@@ -306,6 +314,15 @@ export function resolveProviderModelDraftCommit({
           optionSpecs: effectiveOptionSpecs,
         },
       });
+  const effectiveConfig: ModelConfigObject = {
+    ...currentModel.config,
+    enabled: effectiveEnabled,
+    properties: effectiveProperties,
+    optionSpecs: effectiveOptionSpecs,
+  };
+  // 让列表行等消费方在保存后立即看到新名字，不必等下一次视图刷新。
+  if (displayName) assignMutable(effectiveConfig, "displayName", displayName);
+  else deleteMutable(effectiveConfig, "displayName");
   return {
     status: "commit",
     model: {
@@ -314,12 +331,7 @@ export function resolveProviderModelDraftCommit({
       useRecommendedConfig,
       hasPersonalConfig: Object.keys(personalConfig).length > 0,
       personalConfig,
-      config: {
-        ...currentModel.config,
-        enabled: effectiveEnabled,
-        properties: effectiveProperties,
-        optionSpecs: effectiveOptionSpecs,
-      },
+      config: effectiveConfig,
     },
   };
 }
@@ -339,6 +351,8 @@ function materializeEditorManagedPersonalConfig({
   // 只提取可编辑叶子；隐藏请求映射必须来自当前身份规则，不能由旧模型草稿冻结。
   return extractManualModelConfig({
     ...preserveEnabledPersonalConfig(current),
+    // 显示名随本次草稿物化，切模式不会把它丢掉（它是本 DRAFT 的直接输入，不是继承值）。
+    ...(current.displayName === undefined ? {} : { displayName: current.displayName }),
     properties: effective.properties,
     optionSpecs: effective.optionSpecs,
   });

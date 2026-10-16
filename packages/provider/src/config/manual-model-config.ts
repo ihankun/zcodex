@@ -7,6 +7,8 @@ export const manualModelConfigSchema = completeModelConfigDataSchema
   .pick({ enabled: true })
   .extend({
     enabled: modelConfigDataSchema.shape.enabled,
+    // 展示叶子：手动模式必须显式列入白名单，否则物化结果会被 strict 校验剔掉。
+    displayName: modelConfigDataSchema.shape.displayName,
     properties: complete.properties
       .pick({
         contextWindow: true,

@@ -362,7 +362,7 @@ describe("AutomationEditView session-created dirty state", () => {
       expect(stableHookValues.selectionInputs.at(-1)).toEqual({ selection: original }),
     );
     expect(screen.getByTestId("automation-model-trigger-label").textContent).toBe(
-      "DeepSeek Provider/deepseek-v4-flash",
+      "DeepSeek Provider/DeepSeek V4 Flash",
     );
     expect(onSubmit).not.toHaveBeenCalled();
     expect(editing.modelSelection).toEqual(original);
@@ -443,7 +443,7 @@ describe("AutomationEditView session-created dirty state", () => {
     );
 
     expect(screen.getByTestId("automation-model-trigger-label").textContent).toBe(
-      "DeepSeek Provider/deepseek-v4-flash",
+      "DeepSeek Provider/DeepSeek V4 Flash",
     );
   });
 

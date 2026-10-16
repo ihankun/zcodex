@@ -51,7 +51,8 @@ describe("model selection groups", () => {
       {
         key: `registry-provider:aggregator:${modelId}`,
         value: "custom:aggregator:upstream%2Ffamily%2Fvision-preview",
-        name: modelId,
+        // 显示名解析链见 docs/specs/model-display-name.md；id 仍完整保留在 key/value。
+        name: "Vision Preview",
         supportsVisionInput: true,
       },
     ]);
@@ -107,13 +108,13 @@ describe("model selection groups", () => {
           {
             key: "registry-provider:anthropic-api:claude-a",
             value: "custom:anthropic-api:claude-a",
-            name: "claude-a",
+            name: "Claude A",
             supportsVisionInput: true,
           },
           {
             key: "registry-provider:anthropic-api:claude-b",
             value: "custom:anthropic-api:claude-b",
-            name: "claude-b",
+            name: "Claude B",
           },
         ],
       },
@@ -124,7 +125,7 @@ describe("model selection groups", () => {
           {
             key: "registry-provider:openai-api:model-a",
             value: "custom:openai-api:model-a",
-            name: "model-a",
+            name: "Model A",
           },
         ],
       },

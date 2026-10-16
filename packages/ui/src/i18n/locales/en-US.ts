@@ -3768,6 +3768,8 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.addModel": "Add model",
   "settings.modelProvider.modelId": "Model ID",
   "settings.modelProvider.modelDisplayName": "Display name",
+  "settings.modelProvider.modelDisplayNameHint":
+    "Leave empty to match the name automatically. The display name only affects the UI; requests still use the model ID.",
   "settings.modelProvider.modelApiFormat.anthropic": "Anthropic messages",
   "settings.modelProvider.modelApiFormat.openaiCompatible": "OpenAI Compatible",
   "settings.modelProvider.modelApiFormat.openaiResponses": "OpenAI Responses",
