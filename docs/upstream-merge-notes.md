@@ -574,6 +574,46 @@ DeepSeek 金额余额（含赠金/充值分项）与 OpenCode Go 的 5h / 1w / 1
 **刻意不动**：`BigModelUsageQuotaProvider` 与 GLM 的 coding-plan / start-plan 链路一行未改；
 OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验证，宁可不显示余量段。
 
+### 2.10 模型显示名（对照名字 + 手动覆盖，2026-10-15）
+
+fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek-v4-pro` → `DeepSeek V4 Pro`），
+并可在模型编辑弹窗手动覆盖、持久化。上游没有模型级显示名（`settings.modelProvider.modelDisplayName`
+是上游遗留的死 i18n 键，本 fork 启用它）。完整规则见 `docs/specs/model-display-name.md`。
+
+**新增文件**（上游不会有；冲突时保留本地）：
+`packages/ui/src/lib/modelDisplayName.ts`（解析链 + 品牌表 + fork 对照表）、
+`packages/ui/test/modelDisplayName.test.ts`、`packages/ui/test/modelDisplayNameDraftSave.test.ts`、
+`packages/provider/test/modelDisplayNameConfig.test.ts`、`docs/specs/model-display-name.md`。
+
+**改到的上游文件**（合并时要保住这些挂钩）：
+
+- `packages/shared/src/model-config.ts`：`completeModelConfigDataSchema` 增加可选叶子
+  `displayName: z.string().min(1).optional()`（稀疏 schema 由 `sparseShape` 自动派生，**无需迁移**）。
+- `packages/provider/src/config/model-config.ts`：`ModelConfig` 增加 `displayName`
+  （构造 / `fromData` / `overlay` / `toJSON`）。
+- `packages/provider/src/config/manual-model-config.ts`：手动可编辑白名单加入 `displayName`，
+  否则手动模式物化会被 strict 校验剔掉。
+- `packages/provider/src/resolver.ts`：`serializeRegistryModelConfig` 仅在**有值时**输出
+  `displayName`（避免 `undefined` 键污染下游断言）。
+- `packages/ui/src/settings/model-provider-section/ProviderModelMetadata.ts`：草稿字段
+  `displayNameValue`；提交时写/删个人配置的 `displayName`，并让生效配置立即可见。
+- `ProviderModelMetadataDialog.tsx`：模型 ID 下方新增「显示名称」输入（placeholder = 自动解析结果）。
+- `packages/ui/src/settings/model-provider-section/ProviderFormControls.tsx`：列表行在
+  「解析结果 ≠ id」时改为双行（名字主 + id 副、等宽次要色）。
+- `packages/ui/src/lib/modelSelectionGroups.ts`：选择器 `name` 改为解析结果。**注意该文件里原有一个
+  2 参数的 `resolveModelDisplayName(modelGroups, value)`（上游的「按值反查菜单项名字」），
+  与本 fork 的 `resolveModelDisplayNameForModelId` 是两件事，不要合并或改名。**
+- `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`：新增 `settings.modelProvider.modelDisplayNameHint`。
+
+**上游测试按本 fork 的显示名语义更新了 4 个文件**（它们断言的是**展示名**，不是 id；
+若上游后续重写这些断言，按同样的显示名语义处理）：
+`ui/test/modelSelectionGroups`、`ui/test/automationAgentConfigOptions`、
+`ui/test/subagentsSection`、`ui/test/automationEditSessionCreatedDirtyState`。
+
+**刻意不动**：CLI 与 Agent 侧的模型名（`Model.displayName` 字段保持休眠，协议 label 语义不变）；
+运行时拉取供应商模型名 / 自动发现新模型（评估结论与后续阶段划分见
+`docs/specs/model-display-name.md` 的非目标一节）。
+
 ## 三、踩坑记录（不要再重复）
 
 - **`packages/desktop/src/main/index.ts` 的 `@zcode/shared` 导入列表必须保留 `ZCODE_PRODUCT_FLAVOR`。**
@@ -743,20 +783,21 @@ OpenCode Zen（`opencode-zen-*`）不在名单内——其用量端点未经验�
 
 ## 五、合并冲突决策表
 
-| 冲突场景                                                                                         | 处理方式                                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 上游改动第二节所列文件的**非路径行**                                                             | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                                                   |
-| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`） | 采用上游后手动改为 `.zcodex`                                                                                                                                                     |
-| 上游新增/修改 **user vs workspace** 目录 segments                                                | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                                                       |
-| 上游改 productName / 应用名相关                                                                  | 保留本地 `ZCodex` 命名                                                                                                                                                           |
-| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                     | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                                    |
-| 上游改品牌文案（提示词、原生菜单）                                                               | 直接采用上游                                                                                                                                                                     |
-| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                       | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑥）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节） |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                   | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                           |
-| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）       | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                                  |
-| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                      | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                     |
-| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                     | 对照 2.6。**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**（本 fork 加固版），其余条目可直接采用上游；`stage-agent-bundle.mjs` 现已与上游逐字节一致      |
-| 上游新增数据目录子目录（v2 下新文件等）                                                          | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                                                    |
+| 冲突场景                                                                                                            | 处理方式                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 上游改动第二节所列文件的**非路径行**                                                                                | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                                                                |
+| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`）                    | 采用上游后手动改为 `.zcodex`                                                                                                                                                                  |
+| 上游新增/修改 **user vs workspace** 目录 segments                                                                   | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                                                                    |
+| 上游改 productName / 应用名相关                                                                                     | 保留本地 `ZCodex` 命名                                                                                                                                                                        |
+| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                                        | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                                                 |
+| 上游改品牌文案（提示词、原生菜单）                                                                                  | 直接采用上游                                                                                                                                                                                  |
+| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                                          | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑥）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节）              |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                                      | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                                        |
+| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）                          | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                                               |
+| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                                         | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                                  |
+| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                                        | 对照 2.6。**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**（本 fork 加固版），其余条目可直接采用上游；`stage-agent-bundle.mjs` 现已与上游逐字节一致                   |
+| 上游改模型配置 schema / 模型列表渲染 / 模型选择器（`model-config`、`ProviderFormControls`、`modelSelectionGroups`） | 对照 2.10：保住 `displayName` 叶子、手动白名单项、列表行双行渲染与选择器 `name` 接线；该文件原有 2 参数的 `resolveModelDisplayName` 与本 fork 的 `resolveModelDisplayNameForModelId` 是两件事 |
+| 上游新增数据目录子目录（v2 下新文件等）                                                                             | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                                                                 |
 
 ## 六、合并后自查命令
 
