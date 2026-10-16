@@ -5,6 +5,14 @@
 # E2E PDF fixture 含规范 xref 尾空格，必须按二进制处理，避免 diff --check 误报。
 packages/desktop/test/e2e/fixtures/fs/**/*.pdf binary
 
+# Gen UI 运行时资源按字节 sha256 校验：packages/desktop/scripts/gen-ui-runtime-assets.mjs
+# 与 skills/visualize/assets/runtime-manifest.json 记录的都是原始字节。Windows 检出
+# （core.autocrlf=true）一旦转成 CRLF，打包会在 tsup 阶段因哈希失配中断。
+# 快照按字节保存，不做换行转换，也不参与空白检查。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/** -text -whitespace
+# 同一份清单把这份源文件当作 tweak.js 的字节来源，必须固定 LF。
+packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js text eol=lf
+
 # 上游许可原文与生成的声明按字节保存，不能自动转换换行或裁剪空白。
 # 原文中的 License / ======= 是 Markdown 标题，不是合并冲突。
 THIRD-PARTY-NOTICES.md -text -whitespace conflict-marker-size=32 linguist-generated=true

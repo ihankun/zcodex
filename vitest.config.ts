@@ -96,6 +96,10 @@ export default defineConfig({
             // Gen UI 目录回归位于源码旁，默认入口也必须执行，避免只在手动定向运行时生效。
             "packages/shared/src/node/genUiPaths.test.ts",
             "packages/services/src/gen-ui/**/*.test.ts",
+            // Gen UI 运行时资源按字节 sha256 校验（vendor/manifest.json、runtime-manifest.json）。
+            // 这两条用例是 Windows 检出换行漂移的唯一拦截点：漏跑时打包会在 tsup 阶段才报哈希失配。
+            "packages/desktop/scripts/gen-ui-runtime-assets.test.ts",
+            "packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.test.ts",
             "scripts/assert-safe-cua-helper-zip.test.mjs",
             "scripts/ci/ci-telemetry-keyword-guard.test.mjs",
           ],

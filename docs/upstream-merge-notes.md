@@ -181,7 +181,7 @@
 - `packages/ui/src/settings/model-provider-section/Detail.tsx` — `if (!selectedNavItem)` 分支改为：`presetLoading` 为 true（仍在加载）时显示加载卡片，否则显示空状态引导（不再一直停留在「加载中」）。
 - `packages/ui/src/settings/model-provider-section/StatusCards.tsx` — 新增 `ModelProviderEmptyGuideCard`。
 - `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts` — 新增 `settings.modelProvider.emptyGuide` 文案
-  （fork 独有，合并后按第六节 ⑥ 确认还在）。
+  （fork 独有，合并后按第六节 ⑦ 确认还在）。
 
 #### 2.3.5 隐藏未登录的智谱品牌入口（2026-09-29）
 
@@ -336,7 +336,7 @@ Web 上否则会剩一个点开是空的菜单）。
 | `packages/ui/src/UpdateStatusDialog.tsx`、`UpdateStatusDialogController.tsx`、`UpdateStatusButton.tsx`、`updateStatusModel.ts` | 更新窗口按 `manualInstaller` 显示「安装并重启 / 打开安装包 / 显示安装包」，并渲染更新说明                                                                                                                                                                                                                                                   |
 | `packages/ui/src/lib/desktopUpdateMenu.ts`                                                                                     | 桌面菜单里的手动更新入口                                                                                                                                                                                                                                                                                                                    |
 | `packages/ui/src/root/useRootPlatformEffects.ts`                                                                               | 新增 `manual-ready` 的 toast 分支                                                                                                                                                                                                                                                                                                           |
-| `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts`                                                                            | 新增 `updateDialog.*` / `updateReady.*` / `update.toast.manualReady` 文案（fork 独有，合并后按第六节 ⑥ 确认还在）                                                                                                                                                                                                                           |
+| `packages/ui/src/i18n/locales/zh-CN.ts`、`en-US.ts`                                                                            | 新增 `updateDialog.*` / `updateReady.*` / `update.toast.manualReady` 文案（fork 独有，合并后按第六节 ⑦ 确认还在）                                                                                                                                                                                                                           |
 | `packages/web/src/main.tsx`                                                                                                    | Web 平台实现把这两个方法 stub 成 resolved（Web 没有桌面更新）                                                                                                                                                                                                                                                                               |
 | `README.md`、`NOTICE.md`、根 `package.json`                                                                                    | 发布流程说明、网络行为描述、`publish:github` 脚本入口                                                                                                                                                                                                                                                                                       |
 
@@ -566,7 +566,7 @@ DeepSeek 金额余额（含赠金/充值分项）与 OpenCode Go 的 5h / 1w / 1
 - `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`：`settings.modelProvider.providerBalance.*` **11 条**
   与 `planCard.usage.month`（2026-10-14 更正：此前记的「13 条」有误）。这些是 **fork 独有的 key**，
   合并上游时**不能整取上游 locale 文件**——v3.15.1 合并整取上游时把这一组删了，界面直接显示
-  `settings.modelProvider.providerBalance.title` 这类 raw id；排查与自查见第三节、第六节 ⑥，
+  `settings.modelProvider.providerBalance.title` 这类 raw id；排查与自查见第三节、第六节 ⑦，
   丢失与恢复记录见第七节 2026-10-14 补记。
 - 单测：`packages/services/test/providerBalanceNormalize.test.ts`、
   `packages/ui/test/providerBalancePresentation.test.ts`（合并上游后要一起跑）。
@@ -744,6 +744,20 @@ fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek
   `../../<name>-plugin` 候选从**源码树**解析，**dev 根本不看 `bundled-agents/<平台>/glm/packages/`**；
   打包链才由 `prepare-agent-node-bundle.mjs` 的 `stageOfficialPlugins()` 按源码 stage 到 `glm/packages`。
   2026-10-12 曾因「vendor 载荷全被跳过」误判成 dev 要丢插件，白查一轮——详见 2.6。
+- **Gen UI 运行时资源在 Windows 上必须是 LF，`.gitattributes` 里那两条规则不能删（2026-10-13 实测）。**
+  `apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/**` 与
+  `packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js` 按**原始字节** sha256 校验：
+  前者由 `packages/desktop/scripts/gen-ui-runtime-assets.mjs` 比对 `vendor/manifest.json`、
+  `gen-ui-runtime-assets.test.ts` 比对 `runtime-manifest.json`（它的 `tweak.js` 一项指向上面的
+  `genUiTweakRuntime.js`）。本机 `core.autocrlf=true` 时检出会写成 CRLF，12 个哈希全部失配，表现是
+  **打包在 tsup 阶段中断**：`Error: Gen UI vendor hash mismatch: floating-ui-core-1.7.3.min.js`
+  → `pnpm exec tsup failed with code 1` → `[bundle] pnpm build failed with code 1`，
+  electron-builder 根本不启动（`dist/` 里仍是上一版产物，容易误判成「打包成功但没出 exe」）。
+  这批快照与校验随上游 v3.15.1 进来，所以 v3.15.1 之后第一次在 Windows 打包才暴露；mac/Linux
+  （autocrlf=false）从未受影响。
+  **处理方式是恢复 LF 字节，不要改校验、也不要给这些文件跑格式化**：`rm -rf <路径>` 后
+  `git -c core.autocrlf=false checkout -- <路径>`（`.oxfmtrc.json` 的 ignorePatterns 已覆盖该目录）。
+  自查：`pnpm test:unit` 现在会跑上面两条用例（2026-10-13 加入 include），失配会在单测阶段而非打包阶段报出来。
 - **`packages/ui/src/i18n/locales/{zh-CN,en-US}.ts` 不能「取上游版本 + 重施改名」——fork 独有的 key 会静默消失（2026-10-13 发现，2026-10-14 修复）。**
   这两张表是平铺的 `Record<string, string>`：编译器不做 key 校验，`intl.formatMessage` 找不到 key 时
   **把 id 原样渲染**，`lint` / `architecture:check` / 单测都不覆盖，所以合并自查能全绿而界面一片 raw id
@@ -761,7 +775,7 @@ fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek
     靠 `pnpm typecheck` 的 `TS1005` 才暴露。
   - **不要用 `grep -oE '^\s*"[^"]+":'` 之类的正则提 key**（BSD grep 的 `-o` 在该模式上会漏匹配，
     本次两次得出错误结论）；同理 `comm` 必须 `LC_ALL=C sort` 且两侧一致，否则大量假阳性。
-    用第六节 ⑥ 的 `pnpm i18n:check`。
+    用第六节 ⑦ 的 `pnpm i18n:check`。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
@@ -791,7 +805,7 @@ fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek
 | 上游改 productName / 应用名相关                                                                                     | 保留本地 `ZCodex` 命名                                                                                                                                                                        |
 | 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                                        | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                                                 |
 | 上游改品牌文案（提示词、原生菜单）                                                                                  | 直接采用上游                                                                                                                                                                                  |
-| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                                          | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑥）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节）              |
+| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                                          | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑦）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节）              |
 | 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                                      | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                                        |
 | 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）                          | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                                               |
 | 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                                         | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                                  |
@@ -877,19 +891,27 @@ node_modules/.bin/vitest run \
 #      `zcode-renderer-main`。只把标题单边改回 `ZCode`（或只改一处）就会红。
 #    services/test/providerBalanceNormalize.test.ts、ui/test/providerBalancePresentation.test.ts
 #      钉的是 2.9 余量查询的归一化与展示规则。
-#      注意它与 ⑥ 的分工：这两条钉的是「展示规则返回哪个 key」，⑥ 钉的是「那个 key 在两个
+#      注意它与 ⑦ 的分工：这两条钉的是「展示规则返回哪个 key」，⑦ 钉的是「那个 key 在两个
 #      locale 里真的存在」——v3.15.1 合并后的余量 raw id 事故里，单测全绿而界面是坏的。
 
-# ⑥ i18n key 覆盖（合并整取上游 locale 时的静默丢失口，见第三节）
+# ⑥ Gen UI 运行时资源必须保持 LF（它是字节级 sha256 校验的输入，见「三」的踩坑记录）
+#    2026-10-13 起这两条用例已进 `test:unit` 默认入口，全量单测就会拦住换行漂移。
+node_modules/.bin/vitest run --project unit \
+  packages/desktop/scripts/gen-ui-runtime-assets.test.ts \
+  packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.test.ts
+# 期望：3 passed。命中 CRLF 时的现场是打包在 tsup 阶段报 Gen UI vendor hash mismatch。
+
+# ⑦ i18n key 覆盖（合并整取上游 locale 时的静默丢失口，见第三节）
 #    ① 代码里 `id: "xxx.yyy"` 的引用必须在两个 locale（含 request-security-edition 兜底表）里
 #      存在；② 传 --baseline 时列出「基线有、现在没有」的 key，逐条判断 fork 新增（必须补回）
 #      还是上游删除（忽略，如 v3.15.1 删掉的 5 条 chat.* 上限文案）。
 pnpm i18n:check
 pnpm i18n:check -- --baseline <合并前的 dev tip>
-# 基线（2026-10-14 实测）：① 2786 个 id 全部可解析；② 相对 v3.15.1 合并前的 b3484690，
+# 基线（2026-10-14 实测）：① 2788 个 id 全部可解析；② 相对 v3.15.1 合并前的 b3484690，
 #   zh 剩 6 条 / en 剩 7 条且全部已知：5 条上游删除的 chat.* 上限文案 + providerBusiness.3007
 #   （已搬进 security-edition 表）+ en 侧的 modelSuspiciousEmpty（上游只在 en 的兜底表里给）。
 #   新增任何一条都要能解释来源，别默默接受。
+
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
@@ -1015,7 +1037,7 @@ v3.15.1 自己删除的**（5 条 `chat.*` 上限文案 + `providerBusiness.3007
 `request-security-edition/messages.ts`；一律不恢复）。同时更正 2.9 的「13 条」为 11 条。
 
 **新增工具**：`scripts/check-i18n-locale-keys.mjs`（`pnpm i18n:check`）——① 代码引用 id 覆盖检查、
-② `--baseline <rev>` 的 key 集合比对；已挂进第六节 ⑥，并在第五节决策表加了一行。
+② `--baseline <rev>` 的 key 集合比对；已挂进第六节 ⑦，并在第五节决策表加了一行。
 
 **验证（2026-10-14 实测）**：`pnpm typecheck` exit 0（期间靠它抓出恢复时留下的 `TS2783` 重复 key 与
 `TS1005` 孤儿值行各一次）；`pnpm lint` 62 警告 / 0 错误；`pnpm architecture:check --changed` 0 违规；
