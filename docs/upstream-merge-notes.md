@@ -614,6 +614,29 @@ fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek
 运行时拉取供应商模型名 / 自动发现新模型（评估结论与后续阶段划分见
 `docs/specs/model-display-name.md` 的非目标一节）。
 
+### 2.11 pre-push 不跑受影响单测（2026-10-16）
+
+fork 把 `verify:pre-push` 里的 `test:unit:affected` 去掉了，**push 门禁只保留 lint 与
+architecture:check**。`package.json` 是本文件里唯一改动处，其余脚本与 `.husky/pre-push` 与上游逐字一致。
+
+**为什么去掉**：上游测试套件在本 fork 有 89 个文件 / 454 用例的既有红（断言上游 `.zcode` 路径字面量、
+上游品牌字面量 `ZCode`、上游对 node 内置模块的 mock 不完整、仍 import 已删除模块等；本 fork 没有 CI，
+上游也没有「已知失败」基线）。pre-push 的 `vitest related` 只要 push 里含 `packages/**` 源码改动就会
+把整片红选进来，husky 报 `pre-push script failed (code 1)`、git 显示 `failed to push some refs`——
+**看起来像网络/代理问题，其实是本地钩子**（判断方法：输出里有没有 `husky - pre-push script failed`；
+`git push --no-verify` 能过即证明）。
+
+**评估过但未采用的方案**（记下来免得重做）：给该步骤加「已知失败清单 + 只拦新增失败」的甄别层——
+能跑通且验证过（完整复现被拦范围后放行、造一条新失败会被点名拦下），实现量约 2 个新脚本 + 改一处上游
+runner；按用户决定改用更简单的口径：**本地不跑这套**。
+
+**现状与口径**：
+
+- 手动跑 `pnpm test:unit:affected` 依然会红（口径同上：89 文件 / 454 用例），它是排查工具、不是门禁；
+- 改到测试相关代码时，自己跑目标包的用例（`node_modules/.bin/vitest run <文件>`），或按需全量
+  `pnpm test:unit`；
+- 若将来上游清掉这批既有红、或 fork 接了 CI，可把 `test:unit:affected` 加回 `verify:pre-push`（见第五节决策表）。
+
 ## 三、踩坑记录（不要再重复）
 
 - **`packages/desktop/src/main/index.ts` 的 `@zcode/shared` 导入列表必须保留 `ZCODE_PRODUCT_FLAVOR`。**
@@ -702,8 +725,8 @@ fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek
   项目外的副本会被跳过（既可能报通过、也可能什么都不做）。要对比「上游版本是否也不干净」，
   用 `git show <ref>:<path> > <项目内临时路径>`（同扩展名、在仓库内）再 `oxfmt --check`。
 - **上游 v3.15.1 带来完整 vitest 测试套件（6236 个测试文件），我们的测试口径必须跟着变。**
-  - `pnpm test:unit` = `vitest run`；`pnpm verify:pre-push` 现在是
-    `lint && architecture:check --changed && test:unit:affected`。
+  - `pnpm test:unit` = `vitest run`；`pnpm verify:pre-push` = `lint && architecture:check --changed`
+    （2026-10-16 起不再含 `test:unit:affected`，理由见 2.11）。
   - **我们自己的 4 个测试已转成 vitest**（2026-10-12）：只把 `node:test` 的 `test()` 换成
     `import { test } from "vitest"`，**断言继续用 `node:assert/strict`** —— `assert.deepEqual` 本身就是严格
     语义，不会像 `expect().toEqual()` 那样忽略 `undefined` 属性，「不该有 providerPrefix 键」这类回归断言
@@ -797,21 +820,22 @@ fork 新增：模型列表与模型选择器显示厂商风格名字（`deepseek
 
 ## 五、合并冲突决策表
 
-| 冲突场景                                                                                                            | 处理方式                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 上游改动第二节所列文件的**非路径行**                                                                                | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                                                                |
-| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`）                    | 采用上游后手动改为 `.zcodex`                                                                                                                                                                  |
-| 上游新增/修改 **user vs workspace** 目录 segments                                                                   | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                                                                    |
-| 上游改 productName / 应用名相关                                                                                     | 保留本地 `ZCodex` 命名                                                                                                                                                                        |
-| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                                        | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                                                 |
-| 上游改品牌文案（提示词、原生菜单）                                                                                  | 直接采用上游                                                                                                                                                                                  |
-| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                                          | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑦）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节）              |
-| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                                      | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                                        |
-| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）                          | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                                               |
-| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                                         | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                                  |
-| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                                        | 对照 2.6。**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**（本 fork 加固版），其余条目可直接采用上游；`stage-agent-bundle.mjs` 现已与上游逐字节一致                   |
-| 上游改模型配置 schema / 模型列表渲染 / 模型选择器（`model-config`、`ProviderFormControls`、`modelSelectionGroups`） | 对照 2.10：保住 `displayName` 叶子、手动白名单项、列表行双行渲染与选择器 `name` 接线；该文件原有 2 参数的 `resolveModelDisplayName` 与本 fork 的 `resolveModelDisplayNameForModelId` 是两件事 |
-| 上游新增数据目录子目录（v2 下新文件等）                                                                             | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                                                                 |
+| 冲突场景                                                                                                                              | 处理方式                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 上游改动第二节所列文件的**非路径行**                                                                                                  | 手工合并，保留本地 `.zcodex` / `ZCodex` 字面量                                                                                                                                                |
+| 上游**新增**数据目录路径拼接（home 级或项目级：`homedir(), ".zcode"`、`~/.zcode`、`.zcode/xxx`）                                      | 采用上游后手动改为 `.zcodex`                                                                                                                                                                  |
+| 上游新增/修改 **user vs workspace** 目录 segments                                                                                     | 两级都取 `.zcodex`；作用域已统一（2.2），不要恢复 `.zcode`                                                                                                                                    |
+| 上游改 productName / 应用名相关                                                                                                       | 保留本地 `ZCodex` 命名                                                                                                                                                                        |
+| 上游改 `.zcode-plugin/`、`.zcodeignore` 逻辑                                                                                          | 直接采用上游（这两类是未改动的标识符）；项目内 `.zcodex/` 目录逻辑按 2.2 处理                                                                                                                 |
+| 上游改品牌文案（提示词、原生菜单）                                                                                                    | 直接采用上游                                                                                                                                                                                  |
+| 上游改 `packages/ui/src/i18n/locales/*.ts`                                                                                            | **先取上游再把 fork 独有 key 补回**（`pnpm i18n:check -- --baseline <合并前的 dev tip>`，见第六节 ⑦）；**不要整取上游**——会静默删掉 fork 新增的 key（2026-10-13 踩坑，见第三节）              |
+| 上游改 `ZCODE_*` env、包名、IPC 通道、协议常量                                                                                        | 直接采用上游（本地未定制，无冲突基础）                                                                                                                                                        |
+| 上游改桌面自动更新（`autoUpdater.ts`、服务端 manifest provider、`initAutoUpdater` 传入项）                                            | 保留本地 GitHub Release 方案（2.5），不要恢复服务端清单、`manifestUpdateProvider`、`deviceMid` / `resolveEndpointOrigin` 传入项                                                               |
+| 上游改 UI 的 Logo / 侧栏布局 / 模型设置导航                                                                                           | 对照 2.3，按本地意图保留（只动 Windows 分支，别动 mac 分支）                                                                                                                                  |
+| 上游改内置插件相关（`glm/packages`、seed、`official-plugin-definitions.ts`）                                                          | 对照 2.6。**保住 zcode-guide 的 `version: "0.3.0"` 与那 6 条 `requiredSeedPaths`**（本 fork 加固版），其余条目可直接采用上游；`stage-agent-bundle.mjs` 现已与上游逐字节一致                   |
+| 上游改模型配置 schema / 模型列表渲染 / 模型选择器（`model-config`、`ProviderFormControls`、`modelSelectionGroups`）                   | 对照 2.10：保住 `displayName` 叶子、手动白名单项、列表行双行渲染与选择器 `name` 接线；该文件原有 2 参数的 `resolveModelDisplayName` 与本 fork 的 `resolveModelDisplayNameForModelId` 是两件事 |
+| 上游改 pre-push 链路（`.husky/pre-push`、`package.json` 的 `verify:pre-push`、`lint-staged.config.mjs`、`scripts/run-*-vitest*.mjs`） | 对照 2.11：**`verify:pre-push` 里不要恢复 `test:unit:affected`**（上游既有红会让任何含 `packages/**` 源码改动的 push 失败）；其余脚本可直接采用上游                                           |
+| 上游新增数据目录子目录（v2 下新文件等）                                                                                               | 路径经由枢纽函数（`getZCodeDataRootDir`/`getAppConfigDir`）时自动跟随，无需改；硬编码 `.zcode` 的才需要手动改                                                                                 |
 
 ## 六、合并后自查命令
 
@@ -869,6 +893,7 @@ comm -12 \
 pnpm typecheck && pnpm lint && pnpm architecture:check --changed
 # 基线（2026-10-12，依赖已装）：typecheck exit 0；lint 62 warnings / 0 errors；
 #   architecture 0 违规。没装依赖时 typecheck 报的 39 处 TS2307 是环境噪音，先 pnpm install。
+# pre-push 不跑受影响单测（2.11）：上面的三项是门禁，单测按需手动跑。
 # 改动过 main / preload / renderer 时额外跑（既有缺口基线：main 84、renderer 154，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
 pnpm exec tsc -p packages/desktop/tsconfig.renderer.json --noEmit
