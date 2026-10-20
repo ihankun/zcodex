@@ -861,3 +861,11 @@ exceptions:
       - apps/zcode-cli/packages/adapters/src/model/endpoint-routing-edition/index.ts
       - apps/zcode-cli/packages/adapters/src/model/provider-endpoint-routing-options.ts
     reason: Existing upstream routing assembly files gain the endpoint origin and injected JWT reader; adopting the full CLI model adapter directory needs a separate module boundary refactor.
+  - id: upstream-v3161-source-server-zcodex-path
+    rule: unmanaged-new-file
+    paths:
+      - packages/desktop/src/host/sourceServerDirectory.ts
+      - packages/server/src/source-server/sourceServerProbe.ts
+      - packages/server/src/source-server/transportAdapter.ts
+      - packages/services/src/session/sourceServerWorkspaceAliasRepo.ts
+    reason: 上游 v3.16.1 新增的 Source Server 文件仅做数据目录字面量 .zcode→.zcodex 的 fork 适配，模块边界、owner 与公开契约均未变；接管 desktop/server/session 三个 legacy 包不在本次同步范围。
