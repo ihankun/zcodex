@@ -1,13 +1,13 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
-> 上游基线：**ZCode v3.15.1 = `aac4755`**（= `origin/main`；上一基线 v3.14.3 = `29628c9`，已并入 dev）。
+> 上游基线：**ZCode v3.16.1 = `0a1fc56`**（`chore: sync ZCode source`；上一基线 v3.15.1 = `aac4755`，已并入 dev）。
 > fork 版本号独立演进，当前 `1.3.3`（Windows 快捷方式悬浮描述修复、安装器产品元数据收口这一轮）。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
-> `git diff aac4755 dev -- .` 即全部本地改动；
+> `git diff 0a1fc56 dev -- .` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-10-19（Windows 快捷方式描述与卸载项元数据，见 2.1）。
+> 最近复核：2026-10-20（v3.16.1 合并，见第七节）。
 
 ## 一、概览
 
@@ -191,7 +191,8 @@
 
 - `packages/ui/src/DesktopTopOverlay.tsx` — Windows/Linux（`usesCustomCaptionArea`）下第一个工具按钮原为「默认 logo、hover 切换到折叠侧栏图标」，现改为**恒显折叠侧栏图标**（`SidebarToggleIcon`），不再显示 `logo-zai.svg`。
 - 清理了不再使用的 `appLogoUrl` 传递链：`DesktopTopOverlay.tsx`（prop 与解构）、`app-shell/WorkspaceShellLayout.tsx`（解构与传参）、`app-shell/types.ts`（`WorkspaceShell` 类型定义）、`App.tsx`（import 与传参）。
-- **注意**：`WorkspaceSidebarCollapsedRail.tsx` 的侧栏收起态 logo（自引用 `logo-zai.svg`）不受影响、未改动，也不在待删范围。
+- **注意**：`WorkspaceSidebar/WorkspaceSidebarCollapsedRail.tsx` 曾在收起态显示 logo；上游 v3.16.1
+  的 `project-sidebar` 重构已把该文件连同旧侧栏一起删除，本 fork 只改过它的 `alt` 文案，接受删除即可。
 
 #### 2.3.4 模型设置：无配置时右侧显示空状态引导（去掉永久「加载中」）
 
@@ -277,6 +278,8 @@ Web 上否则会剩一个点开是空的菜单）。
   `resolveCodingPlanEntryPlanState`）与局部量（`upgradeActionLabelId`、`upgradeProviderSnapshot`）。
 - `WorkspaceSidebarFooter.tsx`、`WorkspaceSidebar.tsx`、`SettingsPage.tsx`：`onUpgradeClick`
   这条 prop 链、两侧的 `handleOpenCodingPlanUpgrade*` 与 `useCodingPlanUpgradeDialog()` 解构都已删除。
+  **v3.16.1 起侧栏换成 `packages/ui/src/project-sidebar/index.tsx`**：上游在那里重新接回了
+  `useCodingPlanUpgradeDialog` 与 `onUpgradeClick={upgrade}`，合并时已再次删除（这是该定制的现行落点）。
 - **`upgradeTargetProviderId` / `selectedUpgradeProviderId` 必须保留**（2026-10-12 更正）：
   上游 v3.15.1 新增的营销触达 `components/marketing-touch/MarketingTouchProvider.tsx` 会调用
   `useWorkspaceSidebarFooterUsageSummaryState()` 并消费 `upgradeTargetProviderId`（用于定位升级目标
@@ -650,6 +653,10 @@ runner；按用户决定改用更简单的口径：**本地不跑这套**。
 **现状与口径**：
 
 - 手动跑 `pnpm test:unit:affected` 依然会红（口径同上：89 文件 / 454 用例），它是排查工具、不是门禁；
+- **2026-10-20 上游把 `verify:pre-push` 扩成** `lint + db:schema:check + test:architecture +
+  architecture:check + test:unit:affected`。本 fork 仍只保留 `lint + architecture:check`；
+  新增的 `db:schema:check` / `test:architecture` 可手动跑，但**不要**把 `test:unit:affected`
+  加回门禁（理由同上）；
 - 改到测试相关代码时，自己跑目标包的用例（`node_modules/.bin/vitest run <文件>`），或按需全量
   `pnpm test:unit`；
 - 若将来上游清掉这批既有红、或 fork 接了 CI，可把 `test:unit:affected` 加回 `verify:pre-push`（见第五节决策表）。
@@ -1086,6 +1093,46 @@ v3.15.1 自己删除的**（5 条 `chat.*` 上限文案 + `providerBusiness.3007
 4 个自有测试文件 21 用例全过；`pnpm i18n:check` ① 2786 个 id 全部可解析、② 只剩上述已知项；
 两个 locale 文件与 HEAD 版本的 `oxfmt --check` 结论逐行一致（en-US 的 6 处格式差异是上游继承，
 不是本次引入——判定用**仓库内同目录副本**，别用 /tmp，见第三节）。
+
+### 2026-10-20 上游 v3.15.1 → v3.16.1
+
+上游提交：`0a1fc56 chore: sync ZCode source`（4502 文件，+356395/−121976；`package.json` 3.16.1）。
+
+**冲突 26 处，处理方式：**
+
+| 类别        | 文件                                                                                                                                  | 处理                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 删除/修改   | `manifestUpdateProvider.ts`（本地删 / 上游改）、`WindowsTopLeftLogo.tsx`（本地删 / 上游改）                                            | 均保留删除（2.3.1、2.5）                                                                                                   |
+| 删除/修改   | `WorkspaceSidebar/WorkspaceSidebarCollapsedRail.tsx`（上游删 / 本地改）                                                               | 接受上游删除（旧侧栏被 `project-sidebar` 取代）                                                                            |
+| 结构性      | `WorkspaceSidebar.tsx`                                                                                                                | 采用上游 re-export；本地「移除升级入口」迁移到 `project-sidebar/index.tsx`（2.3.8）                                        |
+| 结构性      | `autoUpdater.ts`                                                                                                                      | 保留 GitHub Release feed 与手动安装；采纳上游 `quitAndInstall` 并发守卫、`publishDownloadedUpdate`、通道锁                   |
+| 结构性      | `WorkspaceShellLayout.tsx` / `DesktopTopOverlay.tsx`                                                                                  | 采用上游新结构；去掉 `appLogoUrl` 传递链、Windows 恒显折叠图标、窗口标题 `ZCodex /`（2.3.2、2.3.3）                        |
+| 结构性      | `SettingsPage.tsx`                                                                                                                    | 采纳上游非桌面端 `remoteDevices` 重定向；继续移除升级入口与 Windows logo（2.3.1、2.3.8）                                    |
+| 结构性      | `WorkspaceHelpMenuButton.tsx`                                                                                                         | 保留本地精简菜单；采纳上游 `@zcode/shared/test-ids` 新路径                                                                 |
+| 结构性      | `WorkspaceSidebarFooterUsageSummary.tsx`                                                                                              | 保留本地无升级入口版本；采纳上游 `SidebarNativeTooltip` 与 test-ids 导入                                                    |
+| 结构性      | `V4ComposerToolbar.tsx`                                                                                                               | 保留余量查询段与「触发器只显示模型名」；采纳上游 team products / `composerOptions`                                          |
+| 结构性      | `web/src/main.tsx`                                                                                                                    | 采用上游 `WebRemoteControlEntry` 重构；重新施加品牌文案；保留两个手动更新 stub                                              |
+| 结构性      | `shared/platform.ts`                                                                                                                  | 合并双方：保留两个手动安装方法，采纳 `getInstalledEditors(filePath?)`                                                       |
+| 字面量      | `settingService`、`wdio.conf`、`remoteAssetPreflight`、`zcodeTaskServiceAdapter`、`remoteWorkspaceServiceCollection`、分享页、i18n 等   | 取上游后重新施加 `.zcodex` / `ZCodex`；`remoteWorkspaceServiceCollection` 接受上游 R3 重构（`usageStatsService` 由连接侧透传） |
+| 文档/配置   | `package.json`、两个 README                                                                                                           | 保留 fork 版本号与 `verify:pre-push` 口径（2.11）；采纳上游新增脚本与 README 简化                                          |
+| 测试        | `subagentsSection.test.ts`                                                                                                            | 采纳上游简化断言，期望值改回显示名 `GPT 5.4`（2.10）                                                                       |
+
+**上游新增源码里的路径**：Source Server / 项目存储迁移 / office-runtime 等新文件的 `.zcode`
+字面量（32 处、15 个文件）按 2.2 统一改为 `.zcodex`，包括 `~/.zcodex/server`、
+`~/.zcodex/cli/...`、`<项目>/.zcodex/document-imports` 与迁移 SQL 的 GLOB。
+
+**i18n**：按 hunk 取上游措辞后统一重施品牌；从基线恢复被上游删掉但代码仍在引用的
+`taskList.noArchivedTasks`、`workspaceSidebar.addProject`。基线比对丢的 105 条全部是上游
+`project-sidebar` 重构删除的旧 key（`workspaceSidebar.*` / `taskList.*` / `remote.*` wizard /
+`webRemoteControl.mobileHome.*`），代码中已无引用，不恢复。`scripts/check-i18n-locale-keys.mjs`
+新增排除 `packages/desktop/scripts/mcp-apps-host-fixture/**`：那里的 `id: "layer.new.layer"`
+是 Gen UI 的 `command_run` 协议 id，不是 UI 文案。
+
+**上游带来的新依赖**：`pnpm install` 已执行（新增 169 个包，含 workspace 依赖 `@zcode/zcode-cua`）。
+
+**合并后自查**：`pnpm typecheck` exit 0；`pnpm lint` 96 warnings / 0 errors；`pnpm architecture:check --changed`
+0 违规；`pnpm i18n:check` 2966 个 id 全部可解析；自有/受影响 11 个测试文件 116 用例全过；
+`tsconfig.renderer.json` 既有缺口 154 → 155（新增 1 个落在上游新代码）。
 
 ## 八、注意事项
 

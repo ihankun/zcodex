@@ -97,6 +97,8 @@ function collectSourceFiles() {
       if (![".ts", ".tsx"].includes(extname(entry))) continue;
       if (relativePath.includes("/i18n/locales/")) continue;
       if (relativePath.includes("/request-security-edition/")) continue;
+      // Gen UI 测试夹具里的 `id: "layer.new.layer"` 是 command_run 的协议 id，不是 UI 文案。
+      if (relativePath.includes("/mcp-apps-host-fixture/")) continue;
       if (/\.test\.tsx?$/.test(relativePath)) continue;
       files.push({ absolutePath, relativePath });
     }
