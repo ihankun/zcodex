@@ -1,13 +1,13 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
-> 上游基线：**ZCode v3.16.1 = `0a1fc56`**（`chore: sync ZCode source`；上一基线 v3.15.1 = `aac4755`，已并入 dev）。
-> fork 版本号独立演进，当前 `1.3.3`（Windows 快捷方式悬浮描述修复、安装器产品元数据收口这一轮）。
+> 上游基线：**ZCode v3.16.2 = `3c5b2276`**（`chore: sync ZCode source`；上一基线 v3.16.1 = `0a1fc56`，已并入 dev）。
+> fork 版本号独立演进，当前 `1.4.0`（上游 v3.16.2 合并这一轮）。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
-> `git diff 0a1fc56 dev -- .` 即全部本地改动；
+> `git diff 3c5b2276 dev -- .` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-10-20（v3.16.1 合并，见第七节）。
+> 最近复核：2026-10-20（v3.16.2 合并，见第七节）。
 
 ## 一、概览
 
@@ -1137,6 +1137,39 @@ v3.15.1 自己删除的**（5 条 `chat.*` 上限文案 + `providerBusiness.3007
 **合并后自查**：`pnpm typecheck` exit 0；`pnpm lint` 96 warnings / 0 errors；`pnpm architecture:check --changed`
 0 违规；`pnpm i18n:check` 2966 个 id 全部可解析；自有/受影响 11 个测试文件 116 用例全过；
 `tsconfig.renderer.json` 既有缺口 154 → 155（新增 1 个落在上游新代码）。
+
+### 2026-10-20 上游 v3.16.1 → v3.16.2
+
+上游提交：`3c5b2276 chore: sync ZCode source`（263 文件，+10549/−4087；`package.json` 3.16.2）。
+
+**冲突 2 处，均为追加型，直接取并集：**
+
+| 文件                      | 冲突                                                    | 处理                                                       |
+| ------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
+| `package.json`            | 上游 `name: zcode` / `version: 3.16.2`                  | 保留 fork `name: zcodex` / `version: 1.4.0`                |
+| `architecture-policy.yaml` | 本 fork 的 Source Server 例外与上游新增例外在同一位置追加 | 两条例外都保留；上游新增 `side-pane-full-view` managed 模块 |
+
+**上游主要内容：**
+
+- **Side Pane 完整视图**：新 managed 模块 `packages/ui/src/side-pane-full-view/`，新增
+  `toggleSidePaneFullView` 快捷键（`CmdOrCtrl+Shift+f`）与桌面对话面板全宽布局；替换了
+  `taskList.openInSplitPane`、`v4Pane.split*` 5 个旧 i18n key（旧 key 代码中已无引用）。
+- **Bash 执行链路**：直连执行、Bash 临时输出目录、后台任务关闭/生命周期接管
+  （`execution-adapter-types.ts`、`node-execution-adapter-{run,lifecycle}.ts` 与 shutdown 测试）。
+- **Workflow 并发治理**：不可重试的 Stop 集（配额、认证等）只终结尝试、不再进入冷却，
+  避免额度重置后子代理全部卡在闸门。
+- **插件市场**：可恢复条目保留 `componentTypes`，卸载后仍归入「UI 插件」；默认市场登记改到写锁内。
+- **项目存储**：新增 `0007_initial_workspace_order` 迁移；本机桌面与 Source Server 共用
+  `tasks-index` 时每次启动幂等补齐当前 owner 的 host 行。
+- **Task facts**：冷恢复只清理被标记为 subagent/workflow/selection-side-chat 的隐藏索引。
+- **桌面**：Windows 托盘与任务栏未读红点改为 1x(16px)/2x(32px) 原生合成，避免 Shell 缩放发糊。
+- 文档（README 版本行、DESIGN.md 完整视图例外）与第三方清单同步。
+
+**合并后自查：** `pnpm typecheck` exit 0；`pnpm lint` 96 warnings / 0 errors；
+`pnpm architecture:check --changed` 0 违规；`pnpm test:architecture` 36 passed；
+`pnpm i18n:check -- --baseline afb5ad55` ① 全部可解析，② 仅上述 5 条上游删除 key；
+自有/受影响 8 个测试文件 54 用例全过。zcode-guide 的 6 条 `requiredSeedPaths` 与 `0.3.0`
+版本经自动合并后保持完整。
 
 ## 八、注意事项
 
