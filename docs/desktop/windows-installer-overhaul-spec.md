@@ -16,7 +16,7 @@
 - 只允许删除当前版本明确声明为应用所有的文件；未知文件默认保留，冲突时以新版本应用文件为准。
 - manifest cleanup 必须拒绝绝对路径、`..` 越界和卸载器自身条目；交互式目录保护扫描的 reparse point/junction 加固与访问预算作为后续收敛项。
 - 安装器对已实现阶段尽力留下日志；日志写入失败不得阻断安装，日志不得记录完整原始命令行、用户数据内容或凭据。
-- 快捷方式只在“已存在但目标失效/不一致”时原位修复；不存在的快捷方式继续尊重用户删除行为。
+- 快捷方式只在“已存在但目标失效/不一致”时重建；目标正确时只刷新过期的产品描述（空描述或历史产品名），保留参数与其他用户设置。不存在的快捷方式继续尊重用户删除行为。
 - 打包态主进程 AUMID 必须等于 electron-builder `appId`；开发态保留独立 AUMID。
 - macOS/Linux 不进入 Windows 安装交接分支；桌面 continuous 与手机 web-remote replayable 状态链路不互相扩散。
 
@@ -88,22 +88,24 @@ installer-completed (日志可查，完成页直接启动 `$INSTDIR\\ZCode.exe`)
 
 ## 快捷方式与 AUMID
 
-- 开始菜单/桌面 `.lnk` 目标正确时原样保留（包括参数）。
-- 目标错误但 `.lnk` 存在时原位修复，随后设置稳定 AUMID 并发送 `SHChangeNotify(SHCNE_UPDATEITEM)`。
+- 开始菜单/桌面 `.lnk` 目标正确时保留原有参数与图标，但描述（`.lnk` 的 `Description`，即资源管理器“备注”和 Windows 悬浮提示读取的字段）必须等于当前安装包的产品描述；历史版本写入的旧产品名（如 `ZCode Desktop App`）或空描述在原地刷新。
+- 目标错误但 `.lnk` 存在时原位重建，随后设置稳定 AUMID 并发送 `SHChangeNotify(SHCNE_UPDATEITEM)`。
 - 用户删除的 `.lnk` 不重建；完成页直接启动新安装目录的 exe。
 - `app.setAppUserModelId()` 在打包态使用生产/Preview 对应 `appId`，开发态使用 `cn.aminer.zcode`。
+- 产品描述的唯一来源是 `packages/desktop/package.json` 的 `description`：electron-builder 把它作为 NSIS `APP_DESCRIPTION` 写入新建快捷方式与卸载项 `Comments`，并作为 Linux 打包产物 `.desktop` 的 `Comment`，因此改产品名时必须同步这一字段。Linux AppImage 运行期写入的用户级 `zcode.desktop` 仍使用固定的归属标记行，不属于该字段。
 
 ## 接受用例
 
-| Case | 场景 | 必须观察到 |
-| --- | --- | --- |
-| WIN-INSTALL-OWNERSHIP-001 | 更新前存在 `notes.txt`/自定义目录 | 更新后文件仍在，应用文件完成替换 |
-| WIN-INSTALL-OWNERSHIP-002 | 旧版本无 manifest | 非本轮保证；允许旧卸载器沿用原生行为，后续只在有明确收益时增加迁移支持 |
-| WIN-INSTALL-DIAG-001 | managed cleanup 遇到锁定/权限/磁盘错误 | cleanup 日志有阶段、分类和数字 PID；外层返回非零并显示清理失败 |
-| WIN-INSTALL-DIAG-003 | 旧版本无 manifest 或解压阶段失败 | 非本轮细粒度诊断保证；保留原生安装器结果，后续按真实问题逐步收敛 |
-| WIN-INSTALL-DIAG-002 | 静默 `/S` 更新 | 无 UI 但有阶段日志，日志 PID 为数字且无原始命令行 |
-| WIN-INSTALL-SHORTCUT-001 | 正确/失效/被删除的快捷方式 | 正确项保留参数，失效项修复，删除项不重建 |
-| WIN-INSTALL-AUMID-001 | 生产与 Preview 打包运行 | 主进程 AUMID 与 NSIS `appId` 相等，可被 Shell 正确索引/固定 |
+| Case                      | 场景                                   | 必须观察到                                                             |
+| ------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| WIN-INSTALL-OWNERSHIP-001 | 更新前存在 `notes.txt`/自定义目录      | 更新后文件仍在，应用文件完成替换                                       |
+| WIN-INSTALL-OWNERSHIP-002 | 旧版本无 manifest                      | 非本轮保证；允许旧卸载器沿用原生行为，后续只在有明确收益时增加迁移支持 |
+| WIN-INSTALL-DIAG-001      | managed cleanup 遇到锁定/权限/磁盘错误 | cleanup 日志有阶段、分类和数字 PID；外层返回非零并显示清理失败         |
+| WIN-INSTALL-DIAG-003      | 旧版本无 manifest 或解压阶段失败       | 非本轮细粒度诊断保证；保留原生安装器结果，后续按真实问题逐步收敛       |
+| WIN-INSTALL-DIAG-002      | 静默 `/S` 更新                         | 无 UI 但有阶段日志，日志 PID 为数字且无原始命令行                      |
+| WIN-INSTALL-SHORTCUT-001  | 正确/失效/被删除的快捷方式             | 正确项保留参数，失效项修复，删除项不重建                               |
+| WIN-INSTALL-SHORTCUT-002  | 目标正确但描述为旧产品名或空           | 原位刷新为当前 `APP_DESCRIPTION`，参数、图标和 AUMID 不变              |
+| WIN-INSTALL-AUMID-001     | 生产与 Preview 打包运行                | 主进程 AUMID 与 NSIS `appId` 相等，可被 Shell 正确索引/固定            |
 
 ## 本轮实现边界
 

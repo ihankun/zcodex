@@ -2,25 +2,25 @@
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
 > 上游基线：**ZCode v3.15.1 = `aac4755`**（= `origin/main`；上一基线 v3.14.3 = `29628c9`，已并入 dev）。
-> fork 版本号独立演进，当前 `1.3.2`（模型显示名与手动覆盖持久化、Windows CRLF 打包修复这一轮）。
+> fork 版本号独立演进，当前 `1.3.3`（Windows 快捷方式悬浮描述修复、安装器产品元数据收口这一轮）。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
 > `git diff aac4755 dev -- .` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-10-16（模型显示名落地，见 2.10）。
+> 最近复核：2026-10-19（Windows 快捷方式描述与卸载项元数据，见 2.1）。
 
 ## 一、概览
 
-| 定制                                                      | 影响面                                      | 详见 |
-| --------------------------------------------------------- | ------------------------------------------- | ---- |
-| 打包应用名 `ZCode` → `ZCodex`，主窗口标题同步             | 9 个文件                                    | 2.1  |
-| 数据目录统一改名 `.zcode` → `.zcodex`（home 级 + 项目级） | 99 个文件（home 字样）+ 约 40 处（项目级）  | 2.2  |
-| UI 定制：Logo / 布局 / 模型设置 / 供应商入口              | `packages/ui`                               | 2.3  |
-| 启动与桌面行为：force-gate、Dock 图标、DMG 底图           | `packages/desktop/src/main`、`build/`       | 2.4  |
-| 桌面自动更新改走 GitHub Release，未签名构建回退手动安装   | desktop + shared + client + ui + web + 构建 | 2.5  |
-| 内置插件：纯源码 seed（载荷机制已删除）                   | 构建流程与产物                              | 2.6  |
-| 用户可见产品名与文案统一为 `ZCodex`                       | ui i18n / web / CLI / 托盘 / 安装器文案     | 2.7  |
-| Finder 右键「在ZCodex中打开」的 Services 注册             | desktop main（上游代码，仅改文案）          | 2.8  |
+| 定制                                                        | 影响面                                      | 详见 |
+| ----------------------------------------------------------- | ------------------------------------------- | ---- |
+| 打包应用名 `ZCode` → `ZCodex`，主窗口标题与快捷方式描述同步 | 10 个文件                                   | 2.1  |
+| 数据目录统一改名 `.zcode` → `.zcodex`（home 级 + 项目级）   | 99 个文件（home 字样）+ 约 40 处（项目级）  | 2.2  |
+| UI 定制：Logo / 布局 / 模型设置 / 供应商入口                | `packages/ui`                               | 2.3  |
+| 启动与桌面行为：force-gate、Dock 图标、DMG 底图             | `packages/desktop/src/main`、`build/`       | 2.4  |
+| 桌面自动更新改走 GitHub Release，未签名构建回退手动安装     | desktop + shared + client + ui + web + 构建 | 2.5  |
+| 内置插件：纯源码 seed（载荷机制已删除）                     | 构建流程与产物                              | 2.6  |
+| 用户可见产品名与文案统一为 `ZCodex`                         | ui i18n / web / CLI / 托盘 / 安装器文案     | 2.7  |
+| Finder 右键「在ZCodex中打开」的 Services 注册               | desktop main（上游代码，仅改文案）          | 2.8  |
 
 **改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面四处**改了内部行为**，合并时最容易出事：
 
@@ -37,14 +37,14 @@
 
 ## 二、本地定制清单（合并冲突时保护本地版本）
 
-### 2.1 应用名与窗口标题（9 个文件）
+### 2.1 应用名与窗口标题（10 个文件）
 
 | 变更       | 原值                                    | 现值                                       |
 | ---------- | --------------------------------------- | ------------------------------------------ |
 | 打包应用名 | `ZCode` / `ZCode Dev` / `ZCode Preview` | `ZCodex` / `ZCodex Dev` / `ZCodex Preview` |
 | 主窗口标题 | `ZCode`                                 | `ZCodex`                                   |
 
-- `packages/desktop/package.json` — `productName: "ZCodex"`
+- `packages/desktop/package.json` — `productName: "ZCodex"`；`description: "ZCodex Desktop App"`（2026-10-19 新增，见下条）
 - `packages/desktop/scripts/desktop-product-identity.mjs` — 正式版 `ZCodex`、Preview 版 `ZCodex Preview`
 - `packages/desktop/scripts/devElectronAppBundle.mjs` — `DEV_ELECTRON_APP_NAME = "ZCodex Dev"`
 - `packages/desktop/src/main/desktopRuntimeEnv.ts` — 运行时应用名三态（Dev/Preview/正式）
@@ -53,6 +53,23 @@
 - `packages/services/src/paths.ts` — Windows 禁止目录守卫（`Program Files\ZCodex`、`...\Programs\ZCodex`）
 - `packages/desktop/src/renderer/index.html` — `<title>ZCodex</title>`（2026-10-08 新增）
 - `packages/shared/src/process-names.ts` — `formatZCodeRendererProcessName` 里的默认标题特例（2026-10-08 新增）
+- `packages/desktop/build/installer.nsh` — 快捷方式描述原位刷新（2026-10-19 新增，见下条）
+
+**Windows 快捷方式悬浮提示显示旧名（2026-10-19）**：悬浮提示读的是 `.lnk` 的 `Description`（资源管理器
+“备注”），不是 exe 的 `FileDescription`。它由 electron-builder 的 NSIS `APP_DESCRIPTION` 写入，来源是
+`packages/desktop/package.json` 的 `description`，原先还是 `ZCode Desktop App`；且更新安装走
+`KeepShortcuts` 时只校验目标路径、不刷新描述，所以升级用户会一直看到旧名。修复分两处：
+`description` 改成 `ZCodex Desktop App`；`installer.nsh` 在目标正确时再读一次 `Description`，
+只对空值或已知历史值（`ZCode Desktop App` / `ZCode`）用 WScript.Shell 原位刷新并重写 AUMID，
+保留参数、图标和用户自定义描述。改产品名时**必须同步这个 `description`**——它同时写进新建快捷方式、
+卸载项 `Comments`，并作为 Linux 打包产物 `.desktop` 的 `Comment`（AppImage 运行期写入的用户级
+`zcode.desktop` 用的是固定归属标记行，不受该字段影响）。
+
+同一轮还收口了安装器产品元数据（`packages/desktop/electron-builder.config.js` 的 `extraMetadata`）：
+`author.name` 改为 `ZCodex`（决定卸载项 Publisher、exe 的 CompanyName 和默认版权行），
+`homepage` 改为本 fork 的 GitHub 仓库（决定卸载项 HelpLink / URLInfoAbout / URLUpdateInfo / Readme）。
+`packages/desktop/package.json` 的 `"author": "HanKun"` 仍是个人作者字段，打包时会被 `extraMetadata`
+覆盖，不要把它当成 Publisher 的来源。
 
 **窗口标题这条容易被忽略，但它是最外显的应用名之一**：macOS Dock 图标右键菜单里带勾的第一行
 不是应用名，而是「当前窗口」项显示的**窗口标题**，即 `index.html` 的 `<title>`。改名前 `lsappinfo`
@@ -63,9 +80,9 @@
 `zcode-renderer-zcodex`，在**资源管理器**的进程列表里直接可见
 （`resourceManagerProcessNames.ts` / `resourceManagerWindow.ts` 都用它给渲染进程命名）。
 
-注意 `packages/desktop/package.json` 的 `"author": "ZCode"` 与
-`packages/desktop/src/main/mcpUserDirectory/legacy.ts` 里的 `join(appData, "ZCode", …)`
-是**有意保留**的（作者字段、旧版 appData 迁移路径），别当成漏改。
+注意 `packages/desktop/package.json` 的 `"author": "HanKun"`（打包时被 `extraMetadata.author`
+覆盖，不是遗漏）与 `packages/desktop/src/main/mcpUserDirectory/legacy.ts` 里的
+`join(appData, "ZCode", …)` 是**有意保留**的（作者字段、旧版 appData 迁移路径），别当成漏改。
 
 尚未改动的同类品牌字样（要改就得成组决定，见第四节）：`packages/web/index.html` 的
 `<title>ZCode</title>`（网页标签标题）、`packages/desktop/src/renderer/cua-permission-panel.html`

@@ -18,6 +18,8 @@ const NSIS_CHECKSUM =
   "VKMiizYdmNdJOWpRGz4trl4lD++BvYP2irAXpMilheUP0pc93iKlWAoP843Vlraj8YG19CVn0j+dCo/hURz9+Q==";
 const NSIS_RESOURCES_CHECKSUM =
   "Dqd6g+2buwwvoG1Vyf6BHR1b+25QMmPcwZx40atOT57gH27rkjOei1L0JTldxZu4NFoEmW4kJgZ3DlSWVON3+Q==";
+// 必须和 fixture 里的 APP_DESCRIPTION 一致；快捷方式刷新后的期望值来自这里。
+const FIXTURE_APP_DESCRIPTION = "ZCode NSIS smoke fixture";
 
 function normalizeWindowsPath(value) {
   return resolve(value).replaceAll("/", "\\").toLowerCase();
@@ -61,6 +63,7 @@ function assertInstallerLog(logPath, mode, role = "outer") {
 function readShortcutProperty(shortcutPath, propertyName) {
   const propertyExpression = {
     arguments: "$shortcut.Arguments",
+    description: "$shortcut.Description",
     targetPath: "$shortcut.TargetPath",
   }[propertyName];
   if (!propertyExpression) {
@@ -84,6 +87,7 @@ function compileFixture({
   nsisResourcesDir,
   outputPath,
   shortcutState,
+  shortcutDescriptionState,
   defaultLogPath,
   elevatedLogPath,
   forceElevatedInner = false,
@@ -91,6 +95,10 @@ function compileFixture({
 }) {
   const args = [
     "/V2",
+    // electron-builder 打包时同样传 -INPUTCHARSET UTF8；脚本含中文注释，
+    // 缺省 ANSI 读取在中文代码页（cp936）下会直接报 Bad text encoding。
+    "-INPUTCHARSET",
+    "UTF8",
     ...(buildUninstaller ? ["/WX", "/DBUILD_UNINSTALLER"] : []),
     `/DNSIS_INCLUDE_DIR=${resolve(nsisDir, "Include")}`,
     `/DELECTRON_BUILDER_NSIS_INCLUDE_DIR=${resolve(appBuilderLibDir, "templates/nsis/include")}`,
@@ -103,6 +111,8 @@ function compileFixture({
     ...(forceElevatedInner ? ["/DFORCE_ELEVATED_INNER"] : []),
     ...(shortcutState !== "deleted" ? ["/DPRECREATE_SHORTCUTS"] : []),
     ...(shortcutState === "stale" ? ["/DSTALE_SHORTCUTS"] : []),
+    ...(shortcutDescriptionState === "custom" ? ["/DCUSTOM_SHORTCUT_DESCRIPTION"] : []),
+    ...(shortcutDescriptionState === "current" ? ["/DCURRENT_SHORTCUT_DESCRIPTION"] : []),
     fixturePath,
   ];
   execFileSync(makensisPath, args, {
@@ -153,62 +163,98 @@ async function main() {
       throw new Error("normal uninstall left the installation directory behind");
     }
 
-    for (const scenario of ["preserved", "stale", "deleted"]) {
-      const installerPath = join(tempRoot, `${scenario}-fixture.exe`);
-      const installDir = join(tempRoot, `${scenario}-install`);
+    const scenarios = [
+      // 目标正确、描述是历史产品名：刷新描述但保留参数。
+      {
+        name: "preserved",
+        shortcutState: "preserved",
+        expectedDescription: FIXTURE_APP_DESCRIPTION,
+      },
+      // 目标正确、描述已是当前值：不改写，参数保留。
+      {
+        name: "current-description",
+        shortcutState: "preserved",
+        shortcutDescriptionState: "current",
+        expectedDescription: FIXTURE_APP_DESCRIPTION,
+      },
+      // 目标正确、用户自定义描述：尊重用户设置。
+      {
+        name: "custom-description",
+        shortcutState: "preserved",
+        shortcutDescriptionState: "custom",
+        expectedDescription: "My custom shortcut",
+      },
+      // 目标失效：重建快捷方式。
+      { name: "stale", shortcutState: "stale", expectedDescription: FIXTURE_APP_DESCRIPTION },
+      // 用户删除：不重建。
+      { name: "deleted", shortcutState: "deleted", expectedDescription: null },
+    ];
+
+    for (const scenario of scenarios) {
+      const installerPath = join(tempRoot, `${scenario.name}-fixture.exe`);
+      const installDir = join(tempRoot, `${scenario.name}-install`);
       compileFixture({
         makensisPath,
         nsisDir,
         nsisResourcesDir,
         outputPath: installerPath,
-        shortcutState: scenario,
-        defaultLogPath: join(tempRoot, `${scenario}-default.log`),
-        elevatedLogPath: join(tempRoot, `${scenario}-elevated.log`),
+        shortcutState: scenario.shortcutState,
+        shortcutDescriptionState: scenario.shortcutDescriptionState,
+        defaultLogPath: join(tempRoot, `${scenario.name}-default.log`),
+        elevatedLogPath: join(tempRoot, `${scenario.name}-elevated.log`),
       });
-      const customLogPath = scenario === "stale" ? join(tempRoot, "custom.log") : undefined;
+      const customLogPath = scenario.name === "stale" ? join(tempRoot, "custom.log") : undefined;
       runFixture(installerPath, installDir, customLogPath);
-      assertInstallerLog(customLogPath ?? join(tempRoot, `${scenario}-default.log`), "silent");
+      assertInstallerLog(customLogPath ?? join(tempRoot, `${scenario.name}-default.log`), "silent");
 
       const appExe = join(installDir, "ZCode.exe");
       const startMenuLink = join(installDir, "start-menu.lnk");
       const desktopLink = join(installDir, "desktop.lnk");
       const launchLink = readFileSync(join(installDir, "launch-link.txt"), "utf-8");
       if (normalizeWindowsPath(launchLink) !== normalizeWindowsPath(appExe)) {
-        throw new Error(`${scenario}: launchLink did not resolve to appExe`);
+        throw new Error(`${scenario.name}: launchLink did not resolve to appExe`);
       }
 
-      if (scenario !== "deleted") {
+      if (scenario.shortcutState !== "deleted") {
         const readShortcutTargetResult = readFileSync(
           join(installDir, "read-shortcut-target.txt"),
           "utf-8",
         );
         const expectedInitialTarget =
-          scenario === "preserved" ? appExe : join(installDir, "stale-target.exe");
+          scenario.shortcutState === "preserved" ? appExe : join(installDir, "stale-target.exe");
         if (
           normalizeWindowsPath(readShortcutTargetResult) !==
           normalizeWindowsPath(expectedInitialTarget)
         ) {
           throw new Error(
-            `${scenario}: installer could not read shortcut target: ${readShortcutTargetResult}`,
+            `${scenario.name}: installer could not read shortcut target: ${readShortcutTargetResult}`,
           );
         }
 
         for (const shortcutPath of [startMenuLink, desktopLink]) {
           if (!existsSync(shortcutPath)) {
-            throw new Error(`${scenario}: expected shortcut was not recreated: ${shortcutPath}`);
+            throw new Error(
+              `${scenario.name}: expected shortcut was not recreated: ${shortcutPath}`,
+            );
           }
           const target = readShortcutProperty(shortcutPath, "targetPath");
           if (normalizeWindowsPath(target) !== normalizeWindowsPath(appExe)) {
-            throw new Error(`${scenario}: shortcut target mismatch: ${target}`);
+            throw new Error(`${scenario.name}: shortcut target mismatch: ${target}`);
           }
           const shortcutArguments = readShortcutProperty(shortcutPath, "arguments");
-          const expectedArguments = scenario === "preserved" ? "--preserved" : "";
+          const expectedArguments = scenario.shortcutState === "preserved" ? "--preserved" : "";
           if (shortcutArguments !== expectedArguments) {
-            throw new Error(`${scenario}: shortcut arguments mismatch: ${shortcutArguments}`);
+            throw new Error(`${scenario.name}: shortcut arguments mismatch: ${shortcutArguments}`);
+          }
+          const description = readShortcutProperty(shortcutPath, "description");
+          if (description !== scenario.expectedDescription) {
+            throw new Error(
+              `${scenario.name}: shortcut description mismatch: expected ${scenario.expectedDescription}, got ${description}`,
+            );
           }
         }
       } else if (existsSync(startMenuLink) || existsSync(desktopLink)) {
-        throw new Error(`${scenario}: a user-deleted shortcut was recreated`);
+        throw new Error(`${scenario.name}: a user-deleted shortcut was recreated`);
       }
     }
 

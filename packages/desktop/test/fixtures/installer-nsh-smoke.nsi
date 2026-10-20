@@ -68,8 +68,19 @@ Section
       CreateShortCut "$newStartMenuLink" "$INSTDIR\stale-target.exe" "--stale"
       CreateShortCut "$newDesktopLink" "$INSTDIR\stale-target.exe" "--stale"
     !else
-      CreateShortCut "$newStartMenuLink" "$appExe" "--preserved"
-      CreateShortCut "$newDesktopLink" "$appExe" "--preserved"
+      !ifdef CUSTOM_SHORTCUT_DESCRIPTION
+        CreateShortCut "$newStartMenuLink" "$appExe" "--preserved" "$appExe" 0 "" "" "My custom shortcut"
+        CreateShortCut "$newDesktopLink" "$appExe" "--preserved" "$appExe" 0 "" "" "My custom shortcut"
+      !else
+        !ifdef CURRENT_SHORTCUT_DESCRIPTION
+          CreateShortCut "$newStartMenuLink" "$appExe" "--preserved" "$appExe" 0 "" "" "${APP_DESCRIPTION}"
+          CreateShortCut "$newDesktopLink" "$appExe" "--preserved" "$appExe" 0 "" "" "${APP_DESCRIPTION}"
+        !else
+          ; 模拟历史安装包写入的旧产品描述，安装器应原位刷新但不丢参数。
+          CreateShortCut "$newStartMenuLink" "$appExe" "--preserved" "$appExe" 0 "" "" "ZCode Desktop App"
+          CreateShortCut "$newDesktopLink" "$appExe" "--preserved" "$appExe" 0 "" "" "ZCode Desktop App"
+        !endif
+      !endif
     !endif
 
     !ifndef BUILD_UNINSTALLER

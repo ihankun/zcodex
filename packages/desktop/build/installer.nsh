@@ -362,7 +362,7 @@
 !macroend
 
 !ifndef BUILD_UNINSTALLER
-  ; 修复原因：electron-builder 会先编译卸载器，但快捷方式目标读取只在安装更新流程中调用。
+  ; 修复原因：electron-builder 会先编译卸载器，但快捷方式读取/刷新只在安装更新流程中调用。
   ; 若把函数带入卸载器，NSIS 会产生 6010 未引用告警，并在 /WX 下直接中断 Windows CI。
   Function ZCodeReadShortcutTarget
     Exch $R9
@@ -386,6 +386,59 @@
       Pop $R1
       Exch $R9
   FunctionEnd
+
+  Function ZCodeReadShortcutDescription
+    Exch $R9
+    Push $R1
+    Push $R2
+
+    StrCpy $R2 ""
+    System::Call 'Kernel32::SetEnvironmentVariableW(w "ZCODE_SHORTCUT_PATH", w "$R9") i.R1'
+    StrCmp $R1 "0" zcodeReadShortcutDescriptionDone 0
+
+    nsExec::ExecToStack /TIMEOUT=5000 `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "[Console]::Out.Write(([Activator]::CreateInstance([type]::GetTypeFromProgID('WScript.Shell'))).CreateShortcut([Environment]::GetEnvironmentVariable('ZCODE_SHORTCUT_PATH')).Description)"`
+    Pop $R1
+    Pop $R2
+    StrCmp $R1 "0" zcodeReadShortcutDescriptionDone 0
+    StrCpy $R2 ""
+
+    zcodeReadShortcutDescriptionDone:
+      System::Call 'Kernel32::SetEnvironmentVariableW(w "ZCODE_SHORTCUT_PATH", p 0) i.R1'
+      StrCpy $R9 "$R2"
+      Pop $R2
+      Pop $R1
+      Exch $R9
+  FunctionEnd
+
+  ; 修复原因：Windows 悬浮提示读取 .lnk 的 Description。更新安装走 KeepShortcuts 时
+  ; 只会保留旧 .lnk，历史产品名会一直显示到用户手动删除快捷方式；这里只改 Description，
+  ; 参数、图标、工作目录等仍由 WScript.Shell 原样保留。
+  ; 返回 PowerShell 退出码："0" 表示写入成功。
+  Function ZCodeRefreshShortcutDescription
+    Exch $R9
+    Push $R1
+    Push $R2
+
+    StrCpy $R2 "1"
+    System::Call 'Kernel32::SetEnvironmentVariableW(w "ZCODE_SHORTCUT_PATH", w "$R9") i.R1'
+    StrCmp $R1 "0" zcodeRefreshShortcutDescriptionDone 0
+    System::Call 'Kernel32::SetEnvironmentVariableW(w "ZCODE_SHORTCUT_DESCRIPTION", w "${APP_DESCRIPTION}") i.R1'
+    StrCmp $R1 "0" zcodeRefreshShortcutDescriptionDone 0
+
+    nsExec::ExecToStack /TIMEOUT=5000 `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$$shortcut = ([Activator]::CreateInstance([type]::GetTypeFromProgID('WScript.Shell'))).CreateShortcut([Environment]::GetEnvironmentVariable('ZCODE_SHORTCUT_PATH')); $$shortcut.Description = [Environment]::GetEnvironmentVariable('ZCODE_SHORTCUT_DESCRIPTION'); $$shortcut.Save()"`
+    ; ExecToStack 先弹出返回码、再弹出输出；输出直接丢弃，只保留退出码。
+    Pop $R1
+    Pop $R2
+    StrCpy $R2 "$R1"
+
+    zcodeRefreshShortcutDescriptionDone:
+      System::Call 'Kernel32::SetEnvironmentVariableW(w "ZCODE_SHORTCUT_PATH", p 0) i.R1'
+      System::Call 'Kernel32::SetEnvironmentVariableW(w "ZCODE_SHORTCUT_DESCRIPTION", p 0) i.R1'
+      StrCpy $R9 "$R2"
+      Pop $R2
+      Pop $R1
+      Exch $R9
+  FunctionEnd
 !endif
 
 !macro ZCodeRepairShortcutIfNeeded SHORTCUT_PATH LABEL_PREFIX
@@ -393,7 +446,7 @@
     Push "${SHORTCUT_PATH}"
     Call ZCodeReadShortcutTarget
     Pop $R0
-    StrCmp $R0 "$appExe" ${LABEL_PREFIX}Done 0
+    StrCmp $R0 "$appExe" ${LABEL_PREFIX}TargetMatches 0
 
     ; 修复原因：历史版本可能留下指向已移动 exe 的 .lnk，但无条件覆盖正确快捷方式会让
     ; 部分 Windows 11 丢失“所有应用”索引或用户固定关系，因此只修复目标不一致的项。
@@ -408,6 +461,33 @@
       WinShell::SetLnkAUMI "${SHORTCUT_PATH}" "${APP_ID}"
       ; 修复后的 .lnk 必须在最后一次写入后通知 Shell，避免开始菜单继续使用旧索引。
       System::Call 'Shell32::SHChangeNotify(i 0x00002000, i 0x0005, w "${SHORTCUT_PATH}", p 0)'
+      Goto ${LABEL_PREFIX}Done
+
+    ; 目标正确时仍要检查 Description：空描述或历史产品名（如 ZCode Desktop App）
+    ; 会让悬浮提示继续显示旧名。用户自定义描述保持不变，因此只匹配已知历史值。
+    ${LABEL_PREFIX}TargetMatches:
+      Push "${SHORTCUT_PATH}"
+      Call ZCodeReadShortcutDescription
+      Pop $R0
+      StrCmp $R0 "${APP_DESCRIPTION}" ${LABEL_PREFIX}Done 0
+      StrCmp $R0 "" ${LABEL_PREFIX}RefreshDescription 0
+      StrCmp $R0 "ZCode Desktop App" ${LABEL_PREFIX}RefreshDescription 0
+      StrCmp $R0 "ZCode" ${LABEL_PREFIX}RefreshDescription ${LABEL_PREFIX}Done
+
+    ${LABEL_PREFIX}RefreshDescription:
+      Push "${SHORTCUT_PATH}"
+      Call ZCodeRefreshShortcutDescription
+      Pop $R0
+      StrCmp $R0 "0" 0 ${LABEL_PREFIX}RefreshFailed
+      ; WScript.Shell 保存会重写 .lnk 属性存储，AUMID 必须重新写入。
+      WinShell::SetLnkAUMI "${SHORTCUT_PATH}" "${APP_ID}"
+      System::Call 'Shell32::SHChangeNotify(i 0x00002000, i 0x0005, w "${SHORTCUT_PATH}", p 0)'
+      Goto ${LABEL_PREFIX}Done
+
+    ${LABEL_PREFIX}RefreshFailed:
+      DetailPrint "Unable to refresh shortcut description: ${SHORTCUT_PATH}"
+      ClearErrors
+
     ${LABEL_PREFIX}Done:
   ${endIf}
 !macroend
