@@ -25,6 +25,9 @@ export function useProviderBalance(options: UseProviderBalanceOptions) {
   const entitlement = useUsageEntitlement({
     enabled,
     preferredProviderId: supported ? providerId : undefined,
+    // 余量查询用 provider 自己的 API Key，不依赖 ZCode 账号会话：
+    // 上游登录门禁（requiresAccountSession 默认 true）不能作用到这条链路。
+    requiresAccountSession: false,
     // 与 GLM 的 Coding Plan / Start Plan 分开缓存指纹：同一 provider 的余量快照独立缓存，
     // 切换 provider 时不会读到上一家的结果（hook 内部还会用 snapshot.provider.id 做归属校验）。
     cacheKey: supported ? `provider-balance:${providerId}` : undefined,

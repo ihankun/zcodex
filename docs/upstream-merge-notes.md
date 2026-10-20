@@ -582,6 +582,10 @@ DeepSeek 金额余额（含赠金/充值分项）与 OpenCode Go 的 5h / 1w / 1
 - `packages/ui/src/v4/composer/V4ComposerToolbar.tsx`、`chat-input-toolbar/contextUsage.tsx`：
   新增 `providerBalance` 段，与 GLM 的 Start Plan / Coding Plan 段并列且互斥；
   hover 刷新复用既有 `onAccess` 链路（60s access 窗口 + in-flight 合并）。
+- `packages/ui/src/hooks/useUsageEntitlement.ts`：**上游 v3.16.1 新增「未登录不请求」门禁**
+  （`authScope === "signed-out"` 时 `enabled=false`）。第三方余量用 provider 自己的 API Key，
+  不依赖 ZCode 账号，因此该 hook 新增 `requiresAccountSession`（默认 `true`），
+  `useProviderBalance` 显式传 `false`。**合并上游后若余量区块一直停在 idle，先查这里**。
 - `packages/ui/src/settings/model-provider-section/Detail.tsx`：通用 provider 分支多渲染一个余量区块。
 - `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`：`settings.modelProvider.providerBalance.*` **11 条**
   与 `planCard.usage.month`（2026-10-14 更正：此前记的「13 条」有误）。这些是 **fork 独有的 key**，

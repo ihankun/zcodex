@@ -666,3 +666,59 @@ it.each(["logout", "account", "session"])(
     }
   },
 );
+
+describe("requiresAccountSession", () => {
+  it("未登录时账号类权益不发起请求", async () => {
+    auth.state = { user: null, authSessionSeq: 0 };
+    const service = {
+      getEntitlementSnapshot: vi.fn(async () =>
+        createSnapshot({ organizationId: "org", projectId: "proj-a" }),
+      ),
+    } as unknown as IUsageStatsService;
+    let state: ReturnType<typeof useUsageEntitlementWithService>;
+    function Probe() {
+      state = useUsageEntitlementWithService(service, {
+        cacheKey: "account-entitlement",
+        refreshOnMount: true,
+      });
+      return null;
+    }
+    const root = createRoot(installMinimalDom());
+    try {
+      await act(async () => root.render(createElement(Probe)));
+      await act(flushPromises);
+      expect(service.getEntitlementSnapshot).not.toHaveBeenCalled();
+      expect(state!.snapshot).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it("requiresAccountSession=false 时未登录仍查询第三方余量", async () => {
+    auth.state = { user: null, authSessionSeq: 0 };
+    const service = {
+      getEntitlementSnapshot: vi.fn(async () =>
+        createSnapshot({ organizationId: "provider-balance", projectId: "proj-b" }),
+      ),
+    } as unknown as IUsageStatsService;
+    let state: ReturnType<typeof useUsageEntitlementWithService>;
+    function Probe() {
+      state = useUsageEntitlementWithService(service, {
+        cacheKey: "provider-balance:deepseek",
+        preferredProviderId: "deepseek",
+        refreshOnMount: true,
+        requiresAccountSession: false,
+      });
+      return null;
+    }
+    const root = createRoot(installMinimalDom());
+    try {
+      await act(async () => root.render(createElement(Probe)));
+      await act(flushPromises);
+      expect(service.getEntitlementSnapshot).toHaveBeenCalledTimes(1);
+      expect(state!.snapshot).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+});

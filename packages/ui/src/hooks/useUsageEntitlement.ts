@@ -144,6 +144,12 @@ export interface UseUsageEntitlementOptions {
   cacheKey?: string;
   refreshOnMount?: boolean;
   mountRefreshReason?: "initial" | "access";
+  /**
+   * 是否要求已登录 ZCode 账号（默认 true）。
+   * 第三方 provider 余量用配置里的 API Key 查询，不依赖账号会话；上游 v3.16.1 的
+   * 登录门禁会把这类请求一并关掉，因此余量链路显式传 false。
+   */
+  requiresAccountSession?: boolean;
 }
 
 export function useUsageEntitlement(options: UseUsageEntitlementOptions = {}) {
@@ -172,8 +178,11 @@ export function useUsageEntitlementWithService(
     (store) => (store.user ? `${store.user.id}:${store.authSessionSeq}` : "signed-out"),
     "unscoped",
   );
+  const requiresAccountSession = options.requiresAccountSession !== false;
   const enabled =
-    (options.enabled ?? true) && Boolean(usageStatsService) && authScope !== "signed-out";
+    (options.enabled ?? true) &&
+    Boolean(usageStatsService) &&
+    (!requiresAccountSession || authScope !== "signed-out");
   const suppliedCacheKey = options.cacheKey?.trim() ?? "";
   const freshnessCacheKey =
     authScope === "unscoped" ? suppliedCacheKey : `${suppliedCacheKey}:auth:${authScope}`;
