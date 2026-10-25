@@ -13,6 +13,12 @@ export const DEFAULT_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
 export const TEST_ZAI_OAUTH_CLIENT_ID = "client_P8X5CMWmlaRO9gyO-KSqtg";
 export const DEFAULT_WEB_REMOTE_CONTROL_RELAY_WS_URL = "wss://zcode.z.ai/api/v1/remote/ws2";
 export const WEB_REMOTE_CONTROL_V4_MIN_APP_VERSION = "3.4.0";
+// fork（ZCodex）：手机远控页面由上游 zcode.z.ai 托管。二维码路径按上游版本门槛选择 /remote/v4，
+// 网关再按 app_version 选择 OSS 上已部署的前端资源。本 fork 产品版本号独立演进（1.x），既低于
+// v4 门槛 3.4.0，也不在网关的版本目录里，直接透传会落到已下线的 v3 或 v4 的 404。
+// 该值只用于手机远控链路（二维码、bootstrap、relay meta），必须是一个网关上实际部署过的上游
+// 版本；合并上游或网关清理旧版本后，需要确认它仍可访问并同步更新。
+export const WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION = "3.16.2";
 
 export interface BuildZCodeEndpointUrlsOptions {
   appVersion?: string;

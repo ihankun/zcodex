@@ -22,12 +22,13 @@
 | 用户可见产品名与文案统一为 `ZCodex`                         | ui i18n / web / CLI / 托盘 / 安装器文案     | 2.7  |
 | Finder 右键「在ZCodex中打开」的 Services 注册               | desktop main（上游代码，仅改文案）          | 2.8  |
 
-**改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面四处**改了内部行为**，合并时最容易出事：
+**改动性质**：多数是用户可见层（应用名、界面、更新流程），但下面五处**改了内部行为**，合并时最容易出事：
 
 - 启动强制升级 gate 已禁用（2.4.1）
 - 桌面自动更新不再读服务端 manifest，改读 GitHub Release（2.5）
 - 数据目录改名：**home 级与项目级现已统一为 `.zcodex`**，不再区分 user/项目作用域（2.2）
 - 内置插件的 seed 结果随定义表变化：`official-plugin-definitions.ts` 与插件源码必须对齐（2.6）
+- 手机远控链路改用上游兼容版本 `3.16.2`，不再透传 fork 的 `1.x` 版本号（2.12）
 
 **明确未改的内部标识符**：npm 包名、`ZCODE_*` 环境变量名、CLI 命令名、IPC 通道名、协议常量、深链 scheme、
 以及 `.zcodeignore`、`.zcode-plugin/`、`.zcode-beta`、`.zcode-install-manifest` 这类隐藏文件名。清单见第四节。
@@ -664,6 +665,33 @@ runner；按用户决定改用更简单的口径：**本地不跑这套**。
 - 改到测试相关代码时，自己跑目标包的用例（`node_modules/.bin/vitest run <文件>`），或按需全量
   `pnpm test:unit`；
 - 若将来上游清掉这批既有红、或 fork 接了 CI，可把 `test:unit:affected` 加回 `verify:pre-push`（见第五节决策表）。
+
+### 2.12 手机远控使用上游兼容版本（2026-10-25）
+
+**现象**：桌面打开「移动端远程控制」，手机扫码后页面显示 `404 This page could not be found.`
+
+**根因**：上游 `buildZCodeEndpointUrls` 用 `appVersion >= 3.4.0` 选择 `/remote/v4`，上游网关再按
+`app_version` 选择 OSS 上已部署的前端版本目录。fork 版本号从 `1.0.0` 起独立演进，`1.4.0`
+既低于 v4 门槛、也不在网关的版本目录中，于是二维码指向已下线的 `/remote/v3`
+（`307 → /cn/remote/v3 → 404`）。与账号套餐无关：页面在登录前就能取到，404 发生在网关路由层。
+
+**修复**：
+
+- `packages/shared/src/zcodeEndpoint.ts` 新增 `WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION = "3.16.2"`；
+- `packages/desktop/src/main/index.ts` 的 `webRemoteControlAppVersion` 改用它（不再用 `ZCODE_VERSION`）。
+
+该值会同时进入二维码 `app_version`、bootstrap `desktopAppVersion` 和 relay `meta.version`，三处必须
+一致：手机页面的版本守卫会用 bootstrap 返回的 `desktopAppVersion` 回写 URL 并重新加载，只改路径或
+只改二维码参数都会再次 404。
+
+**维护口径**：
+
+- 该常量必须是网关上实际部署过的上游版本。合并上游或网关清理旧版本后，用
+  `curl -o /dev/null -w '%{http_code}' 'https://zcode.z.ai/remote/v4?app_version=<ver>'`
+  确认返回 200 再更新；当前 `3.16.2` / `3.16.1` / `3.15.2` / `3.15.1` / `3.14.0` 可用，`3.16.0`、`3.4.0`、
+  `1.4.0`、`9.9.9` 均返回 404；
+- `ZCODE_WEB_REMOTE_CONTROL_URL` 只能改 base URL，改不了 `app_version`，不能作为替代方案；
+- fork 的 `1.x` 版本号仍用于桌面更新、遥测等自有链路，不要把它传回远控链路。
 
 ## 三、踩坑记录（不要再重复）
 

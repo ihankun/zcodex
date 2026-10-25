@@ -11,6 +11,7 @@ import {
   TEST_ZAI_OAUTH_CLIENT_ID,
   TEST_ZAI_OAUTH_ORIGIN,
   TEST_ZCODE_ENDPOINT_ORIGIN,
+  WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION,
   buildBigModelCodingPlanPersonalManageUrl,
   buildBigModelCodingPlanTeamManageUrl,
   buildBigModelApiUrl,
@@ -95,6 +96,16 @@ describe("zcodeEndpoint", () => {
     );
     expect(
       buildZCodeEndpointUrls("https://zcode.z.ai", { appVersion: "3.5.0-beta.1" }).remoteUrl,
+    ).toBe("https://zcode.z.ai/remote/v4");
+  });
+
+  it("keeps the fork web remote control entry on a deployed upstream version", () => {
+    // fork 的 1.x 版本号既低于 v4 门槛，也不在网关版本目录里；远控链路必须使用上游兼容版本。
+    expect(WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION).toBe("3.16.2");
+    expect(
+      buildZCodeEndpointUrls(DEFAULT_ZCODE_ENDPOINT_ORIGIN, {
+        appVersion: WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION,
+      }).remoteUrl,
     ).toBe("https://zcode.z.ai/remote/v4");
   });
 

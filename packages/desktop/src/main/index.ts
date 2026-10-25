@@ -82,6 +82,7 @@ import {
   DEFAULT_LOCALE,
   TEST_ZCODE_ENDPOINT_ORIGIN,
   ZCODE_VERSION,
+  WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION,
   buildZCodeEndpointUrls,
   resolveWebRemoteControlRelayWsUrl,
   resolveZCodeEndpointOrigin,
@@ -897,7 +898,10 @@ const armsUserIdentitySync = createArmsUserIdentitySync({
   deviceMid,
   setUser: (user) => armsRum.setConfig("user", user),
 });
-const webRemoteControlAppVersion = ZCODE_VERSION || app.getVersion();
+// 上游网关按 app_version 选择远控前端资源，只认上游版本序列；fork 的 1.x 版本号会让二维码
+// 落到已下线的 /remote/v3，或让 v4 页面按不存在的版本目录 404。远控链路统一使用兼容版本，
+// 桌面更新、遥测等自有链路仍使用 ZCODE_VERSION。
+const webRemoteControlAppVersion = WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION;
 const defaultZCodeEndpointUrls = buildZCodeEndpointUrls(DEFAULT_ZCODE_ENDPOINT_ORIGIN, {
   appVersion: webRemoteControlAppVersion,
 });

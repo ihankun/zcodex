@@ -73,6 +73,13 @@ local/custom:        ws://localhost:3030/api/v1/remote/ws2
 入口。没有覆盖时，localhost/custom endpoint 同样从各自 origin 推导 relay。当前桌面版本生成
 `/remote/v4` 二维码；`ZCODE_WEB_REMOTE_CONTROL_URL` 用于显式调试覆盖。
 
+**Fork 版本兼容（ZCodex）**：二维码路径由 `appVersion >= 3.4.0` 决定 `/remote/v4`，网关再按
+`app_version` 选择 OSS 上已部署的前端目录。本 fork 的产品版本号独立演进（`1.x`），不能用于这两处
+上游版本判断，否则会落到已下线的 `/remote/v3` 或 v4 下不存在的版本目录而 404。
+远控链路统一使用 `WEB_REMOTE_CONTROL_UPSTREAM_APP_VERSION`（`packages/shared/src/zcodeEndpoint.ts`），
+它必须指向一个网关上实际部署过的上游版本；合并上游或网关清理旧版本后需要同步更新。
+fork 产品版本仍用于桌面更新、遥测等自有链路。
+
 开发时可以把手机页指向本地 web：
 
 ```bash
