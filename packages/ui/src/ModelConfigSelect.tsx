@@ -56,6 +56,7 @@ import {
   type ComposerModelOptions,
 } from "@/chat-input-toolbar/ComposerModelMenu.js";
 import { ModelInputCapabilityBadge } from "@/components/ModelInputCapabilityBadge.js";
+import { ProviderLogo } from "@/settings/model-provider-section/ProviderLogo.js";
 
 export interface ModelSelectGroupItem {
   key: string;
@@ -262,6 +263,11 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
     normalizedValue = previous.normalizedValue;
     triggerLabel = previous.triggerLabel;
   } else presentation.current = { composerOptions, modelGroups, normalizedValue, triggerLabel };
+  // 合并入口的来源标识只看当前选中值所在分组；这里读取的是上面可能已冻结的展示投影，
+  // 保证 logo 与模型文案始终来自同一次渲染事实，不会在切换 Provider 的 pending 期间错配。
+  const composerProviderLogo = composerOptions
+    ? modelGroups.find((group) => group.items.some((item) => item.value === normalizedValue))?.logo
+    : undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -535,6 +541,12 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
     modelGroups.flatMap((group) => group.items).find((item) => item.value === normalizedValue)
       ?.name ?? "",
   );
+  // 同名模型可能来自不同 Provider：合并入口直接前置来源 logo，用户不必每次展开菜单确认。
+  // 无 logo（或其他复用界面）时仍走原有 PackageIcon 分支，保持原布局。
+  const triggerProviderLogo = composerProviderLogo ? (
+    <ProviderLogo logo={composerProviderLogo} className="pointer-events-none size-4" />
+  ) : undefined;
+  const triggerLeadingIcon = triggerIcon ?? triggerProviderLogo;
   const triggerContents = showSelectionLabel ? (
     <>
       <span
@@ -548,7 +560,7 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
         aria-hidden="true"
         className="hidden size-4 shrink-0 items-center text-foreground-subtle group-data-[composer-model-icon=true]/toolbar:inline-flex"
       >
-        {triggerIcon ?? <PackageIcon className="size-4" />}
+        {triggerLeadingIcon ?? <PackageIcon className="size-4" />}
       </span>
       <span
         data-composer-open-thought
@@ -559,7 +571,7 @@ export const ModelConfigSelect = memo(function ModelConfigSelectComponent({
     </>
   ) : (
     <>
-      {triggerIcon ?? (
+      {triggerLeadingIcon ?? (
         <PackageIcon
           className={cn("pointer-events-none size-4 shrink-0 text-current", triggerIconClassName)}
           aria-hidden="true"

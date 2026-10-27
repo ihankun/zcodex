@@ -14,6 +14,7 @@ import {
   type ModelSelectGroup,
 } from "@/ModelConfigSelect.js";
 import { shouldRestoreChatInputFocusAfterPickerClose } from "@/lib/pickerFocus.js";
+import type { ComposerModelOptions } from "@/chat-input-toolbar/ComposerModelMenu.js";
 
 function createGroup(key: string): ModelSelectGroup {
   return {
@@ -184,6 +185,139 @@ describe("ModelConfigSelect trigger label", () => {
 
     expect(html.indexOf("Switching model")).toBeGreaterThanOrEqual(0);
     expect(html.indexOf("Switching model")).toBeLessThan(html.indexOf("lucide-loader"));
+  });
+});
+
+describe("ModelConfigSelect trigger provider logo", () => {
+  function createComposerOptions(
+    overrides: Partial<ComposerModelOptions> = {},
+  ): ComposerModelOptions {
+    return {
+      providerLabel: "Provider",
+      modelsLabel: "Models",
+      effortLabel: "Effort",
+      selectModelLabel: "Select model",
+      levels: [],
+      value: "",
+      onValueChange: () => {},
+      ...overrides,
+    };
+  }
+
+  function createLogoGroup(key: string, logoKey: string): ModelSelectGroup {
+    return { ...createGroup(key), logo: { type: "builtin", key: logoKey } };
+  }
+
+  function renderPicker(element: ReactElement) {
+    return createElement(
+      ZCodeIntlProvider,
+      { initialLocale: "zh-CN" },
+      createElement(TooltipProvider, null, element),
+    );
+  }
+
+  it("合并入口在模型名之前展示当前 Provider 的 logo", () => {
+    const html = renderWithTooltipProvider(
+      createElement(ModelConfigSelect, {
+        composerOptions: createComposerOptions(),
+        modelGroups: [createLogoGroup("deepseek", "deepseek")],
+        normalizedValue: "deepseek/model",
+        triggerLabel: "DeepSeek Flash",
+        showManageModelsAction: false,
+        lockReasonMessage: "",
+        isItemLocked: () => false,
+        onValueChange: () => {},
+      }),
+    );
+
+    const logoIndex = html.indexOf("<img");
+    expect(logoIndex).toBeGreaterThanOrEqual(0);
+    // aria-label 与 title 也包含模型名，取最后一次出现（可见文案）判断左右顺序。
+    expect(logoIndex).toBeLessThan(html.lastIndexOf("DeepSeek Flash"));
+  });
+
+  it("未配置 logo 或未启用合并入口时保持原布局", () => {
+    const withoutLogo = renderWithTooltipProvider(
+      createElement(ModelConfigSelect, {
+        composerOptions: createComposerOptions(),
+        modelGroups: [createGroup("deepseek")],
+        normalizedValue: "deepseek/model",
+        triggerLabel: "DeepSeek Flash",
+        showManageModelsAction: false,
+        lockReasonMessage: "",
+        isItemLocked: () => false,
+        onValueChange: () => {},
+      }),
+    );
+    const settingsSurface = renderWithTooltipProvider(
+      createElement(ModelConfigSelect, {
+        modelGroups: [createLogoGroup("deepseek", "deepseek")],
+        normalizedValue: "deepseek/model",
+        triggerLabel: "DeepSeek Flash",
+        showManageModelsAction: false,
+        lockReasonMessage: "",
+        isItemLocked: () => false,
+        onValueChange: () => {},
+      }),
+    );
+
+    expect(withoutLogo).not.toContain("<img");
+    expect(settingsSurface).not.toContain("<img");
+  });
+
+  it("pending 期间 logo 与文案保持同一次展示投影，不被新 Provider 覆盖", () => {
+    const deepSeek = createLogoGroup("deepseek", "deepseek");
+    const openRouter = createLogoGroup("openrouter", "openrouter");
+    const renderWith = (props: {
+      groups: readonly ModelSelectGroup[];
+      normalizedValue: string;
+      triggerLabel: string;
+      pending: boolean;
+    }) =>
+      renderPicker(
+        createElement(ModelConfigSelect, {
+          composerOptions: createComposerOptions({
+            providerMenu: {
+              groups: props.groups,
+              selectedKey: props.groups[0]?.key,
+              pending: props.pending,
+              error: null,
+              onSelect: () => {},
+            },
+          }),
+          modelGroups: props.groups,
+          normalizedValue: props.normalizedValue,
+          triggerLabel: props.triggerLabel,
+          showManageModelsAction: false,
+          lockReasonMessage: "",
+          isItemLocked: () => false,
+          onValueChange: () => {},
+        }),
+      );
+
+    const view = render(
+      renderWith({
+        groups: [deepSeek],
+        normalizedValue: "deepseek/model",
+        triggerLabel: "DeepSeek Flash",
+        pending: false,
+      }),
+    );
+    const initialSrc = view.container.querySelector("button img")?.getAttribute("src") ?? null;
+    expect(initialSrc).not.toBeNull();
+
+    view.rerender(
+      renderWith({
+        groups: [openRouter],
+        normalizedValue: "openrouter/model",
+        triggerLabel: "OpenRouter Model",
+        pending: true,
+      }),
+    );
+
+    expect(view.container.querySelector("button img")?.getAttribute("src")).toBe(initialSrc);
+    expect(view.container.textContent).toContain("DeepSeek Flash");
+    expect(view.container.textContent).not.toContain("OpenRouter Model");
   });
 });
 

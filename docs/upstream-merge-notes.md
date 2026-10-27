@@ -229,6 +229,11 @@
   或「tooltip 也丢了来源」（改少了）。
 
 - 效果：宽窄容器下 trigger 都只有模型名（等价于上游的 compact 态）。
+- 2026-10-27 增补：模型名前改为显示当前 Provider 的 logo（`ModelConfigSelect.tsx` 按
+  `composerOptions` + 选中值所在分组的 `config.logo` 派生，pending 期间沿用冻结投影），
+  继续不显示 `厂商/` 文字前缀；tooltip / aria-label 语义不变。压缩末档原本的 `Package`
+  图标在有 logo 时换成该 logo。合并上游这两段时不要只剩文字、也不要恢复前缀。
+  回归防线：`packages/ui/test/modelConfigSelect.test.ts` 的 trigger provider logo 用例。
 - 历史：2026-09-29 起是「非空供应商数 ≤ 1 时不显示」，2026-10-08 改为一律不显示。
 - 内置 family 供应商（`account:zai-*` / `account:bigmodel-*`）的 tooltip 也**不带**厂商名，
   这是 `formatProviderModelLabel` 的上游规则（连接名拼进模型文案会重复展示套餐信息），本地未改。
