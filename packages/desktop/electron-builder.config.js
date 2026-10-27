@@ -565,7 +565,7 @@ export default {
     zcodeProductFlavor: desktopProductIdentity.flavor,
     homepage: "https://github.com/ihankun/zcodex",
     author: {
-      name: "ZCodex",
+      name: "HanKun",
       email: "ihankun@outlook.com",
     },
   },
