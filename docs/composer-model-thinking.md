@@ -8,7 +8,7 @@
 [ ▣GLM-5.3-Flash High ▾ ]  → [ ▣GLM-5.3-Flash ▮ ] → [ ▣ ▮ ]
 ```
 
-`▣` 是 Provider logo：取自目录中该 Provider 的 `config.logo`，与模型文案使用同一份（pending 期间已冻结的）分组和选中值派生，切换 Provider 时不会出现「新 logo + 旧模型名」的错配。没有 logo 或资源无法解析时保持原有表现：普通态不显示前置图标，压缩末档回退到通用模型图标。logo 不单独响应点击，也不并入 Tooltip／无障碍文案中的模型名；桌面、普通 Web 与手机 Web 一致。多个 Provider 提供同名模型时，用户无需展开菜单即可从 logo 判断当前模型来源。
+`▣` 是 Provider logo：取自目录中该 Provider 的 `config.logo`，与模型文案使用同一份（pending 期间已冻结的）分组和选中值派生，切换 Provider 时不会出现「新 logo + 旧模型名」的错配。素材按解析后的深浅主题选择：`system` 模式订阅系统主题变化重新渲染，浅色底素材（DeepSeek / OpenAI / Anthropic）使用深色变体，其余单素材品牌两套主题复用同一份资源。没有 logo 或资源无法解析时保持原有表现：普通态不显示前置图标，压缩末档回退到通用模型图标。logo 不单独响应点击，也不并入 Tooltip／无障碍文案中的模型名；桌面、普通 Web 与手机 Web 一致。多个 Provider 提供同名模型时，用户无需展开菜单即可从 logo 判断当前模型来源。
 
 菜单显示 Models（中文「模型」）分区标题，使用 text-ui-sm 和次要文字色；模型名称保持基础字号，能力标签保持原样。
 

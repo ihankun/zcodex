@@ -234,6 +234,12 @@
   继续不显示 `厂商/` 文字前缀；tooltip / aria-label 语义不变。压缩末档原本的 `Package`
   图标在有 logo 时换成该 logo。合并上游这两段时不要只剩文字、也不要恢复前缀。
   回归防线：`packages/ui/test/modelConfigSelect.test.ts` 的 trigger provider logo 用例。
+- 2026-10-28 增补：logo 跟随解析后的主题。`ProviderLogo` 改用 `useResolvedTheme`
+  （`packages/ui/src/store/StoreProvider.tsx`），`system` 模式下订阅
+  `prefers-color-scheme`，修复系统主题变化时 logo 不重渲染；DeepSeek / OpenAI /
+  Anthropic 增加深色变体素材（来源与派生方式记录在
+  `assets/provider-icons/model-provider-logo-sources.json`）。上游若替换 logo 素材，
+  保留 `dark` 槽位与 `useResolvedTheme` 订阅。
 - 历史：2026-09-29 起是「非空供应商数 ≤ 1 时不显示」，2026-10-08 改为一律不显示。
 - 内置 family 供应商（`account:zai-*` / `account:bigmodel-*`）的 tooltip 也**不带**厂商名，
   这是 `formatProviderModelLabel` 的上游规则（连接名拼进模型文案会重复展示套餐信息），本地未改。

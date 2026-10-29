@@ -14,6 +14,7 @@ import {
 import { useStore } from "zustand";
 import type { IBroadcastService } from "@zcode/services";
 import { createZCodeStore, type ZCodeStore, type ZCodeState } from "./index.js";
+import { resolveTheme, type ResolvedTheme, type Theme } from "../useTheme.js";
 
 // 导出 Context 供测试直接注入已构造的 store 实例（如跨窗口广播抑制用例）。
 export const StoreContext = createContext<ZCodeStore | null>(null);
@@ -74,4 +75,40 @@ export function useZCodeStoreWithDefault<T>(
   );
   const getSnapshot = () => (store ? selector(store.getState()) : defaultValue);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+function subscribeSystemTheme(onChange: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => {};
+  }
+
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  // 与 store 的 system 监听保持一致：部分 Electron / Chromium 组合只支持旧版 listener API。
+  if (typeof mediaQuery.addEventListener === "function") {
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }
+  mediaQuery.addListener(onChange);
+  return () => mediaQuery.removeListener(onChange);
+}
+
+function subscribeNothing(): () => void {
+  return () => {};
+}
+
+/**
+ * 解析后的深浅主题。
+ *
+ * system 模式必须额外订阅系统偏好：applyTheme 只更新 DOM class，store.theme 仍是
+ * "system"，单纯读 store 的展示组件不会重渲染，主题资源（如 Provider logo）会停留在
+ * 切换前的那一份。
+ */
+export function useResolvedTheme(): ResolvedTheme {
+  const theme: Theme = useZCodeStoreWithDefault((state) => state.theme, "zai-dark");
+  const getSnapshot = () => resolveTheme(theme);
+  return useSyncExternalStore(
+    theme === "system" ? subscribeSystemTheme : subscribeNothing,
+    getSnapshot,
+    getSnapshot,
+  );
 }
