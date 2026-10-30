@@ -312,11 +312,14 @@ export interface AppSettings {
   closeToTrayLinuxMigrationInitialized?: boolean;
   /** 桌面端全局页面缩放档位；用于重启后恢复界面缩放，Web/手机端忽略。 */
   desktopZoomLevel?: number;
-  /** 桌面主窗口最近一次非最大化宽高及最大化状态；Web/手机端忽略。 */
+  /** 桌面主窗口最近一次非最大化宽高、左上角位置及最大化状态；Web/手机端忽略。 */
   desktopWindowSize?: {
     width: number;
     height: number;
     maximized: boolean;
+    /** 窗口左上角；旧设置没有该字段，缺失时由系统决定初始位置。 */
+    x?: number;
+    y?: number;
   };
   /** 桌面端 Chromium 硬件加速开关；只在下次启动 main 进程早期生效，Web/手机端忽略。 */
   desktopChromiumHardwareAccelerationEnabled?: boolean;

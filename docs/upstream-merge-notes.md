@@ -354,6 +354,21 @@ REF-02/03/04 仍按 `rewards-menu-item` 断言（且还断言 2.3.8 已删除的
 `packages/desktop/build/dmg_background.png` 与 `dmg_background@2x.png` — 文字由 ZCODE 重绘为 ZCODEX
 （PIL 生成，保留箭头与装饰图标）。上游更新此图后需重新处理文字。
 
+#### 2.4.4 主窗口位置记忆（2026-10-30）
+
+上游 `desktopWindowSize` 只保存 `width` / `height` / `maximized`；本 fork 增加可选 `x` / `y`：
+
+- `packages/shared/src/protocol.ts` 的 `AppSettings.desktopWindowSize` 增加可选 `x` / `y`；
+- `packages/shared/src/validationAppSettings.ts` 的 schema 同步增加可选整数（旧设置没有这两个字段仍合法）；
+- `packages/desktop/src/main/desktopWindowSize.ts` 的 `resolveDesktopWindowSize` 改为接收主屏与全部显示器
+  工作区：有历史位置时先按窗口左上角落点选显示器、再按重叠区域兜底，并把位置收敛到工作区；保存位置
+  不在任何当前显示器上（外接屏被拔掉）时回主屏居中；没有位置字段时不传 `x` / `y`，保持系统默认放置；
+- `attachDesktopWindowSizePersistence` 同时监听 `move`，与 resize 共用 250ms 防抖，保存 normal bounds
+  的 `x` / `y`；
+- `packages/desktop/src/main/desktopWindowChrome.ts` 仅在 `x` / `y` 都存在时传给 `BrowserWindow`。
+
+合并上游时保留这些；上游若重写 `desktopWindowSize.ts` 或 schema，不要把位置逻辑整段丢掉。
+
 ### 2.5 桌面自动更新源：GitHub Release
 
 #### 为什么改

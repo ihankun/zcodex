@@ -608,11 +608,15 @@ export function createBrowserWindow(options: {
 }): BrowserWindow {
   const initialDesktopZoomLevel = clampDesktopZoomLevel(options.initialDesktopZoomLevel ?? 0);
   const initialDesktopZoomFactor = resolveDesktopZoomFactorForLevel(initialDesktopZoomLevel);
-  const initialWindowSize = resolveDesktopWindowSize(
-    options.initialWindowSize,
-    screen.getPrimaryDisplay().workAreaSize,
-  );
+  const initialWindowSize = resolveDesktopWindowSize(options.initialWindowSize, {
+    primaryWorkArea: screen.getPrimaryDisplay().workArea,
+    workAreas: screen.getAllDisplays().map((display) => display.workArea),
+  });
   const win = new BrowserWindow({
+    // 有历史位置时按保存的左上角恢复；缺失时交给系统默认放置，保持旧版本行为。
+    ...(initialWindowSize.x !== undefined && initialWindowSize.y !== undefined
+      ? { x: initialWindowSize.x, y: initialWindowSize.y }
+      : {}),
     width: initialWindowSize.width,
     height: initialWindowSize.height,
     minWidth: MIN_DESKTOP_WINDOW_WIDTH,

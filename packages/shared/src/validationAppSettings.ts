@@ -52,6 +52,9 @@ const desktopWindowSizeSchema = z.object({
   width: z.number().int().min(480),
   height: z.number().int().min(640),
   maximized: z.boolean(),
+  // 位置可以是负数（显示器位于主屏左侧/上方）；旧设置没有这两个字段。
+  x: z.number().int().optional(),
+  y: z.number().int().optional(),
 });
 export const integratedTerminalShellSelectionSchema = z.discriminatedUnion("mode", [
   z.object({
