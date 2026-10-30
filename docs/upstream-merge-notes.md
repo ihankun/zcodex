@@ -307,6 +307,31 @@ Web 上否则会剩一个点开是空的菜单）。
   另外 `CodingPlanUpgradeDialogProvider` 与套餐卡上的升级入口**没动**：设置页等处仍有其他升级入口。
 - i18n 的 `sidebar.usage.plan.upgrade` / `.renew` 文案保留（仍是套餐卡的文案来源）。
 
+#### 2.3.9 左下角账号菜单移除「邀请好友」入口（2026-10-30）
+
+`packages/ui/src/WorkspaceSidebarFooter.tsx` 的账号菜单里，rewards 的「邀请好友 / 奖励」项
+（`data-testid="rewards-menu-item"`，含 `rewards-reward-badge`）已移除。连带删掉该文件里只为它
+服务的 `useOpenRewards`、`Gift`、`Badge` 导入与 `openRewards` 局部量。
+
+**奖励中心本身保留**：`rewards/RewardsProvider.tsx`、`RewardsWebview` 与 `rewards.title` 等文案不动；
+营销 Banner / 独立弹窗的 `navigate: rewards`（`MarketingTouchProvider`）仍会调用 `useOpenRewards`
+打开同一网页。i18n 的 `rewards.menuTitle` / `rewards.menuBadge` 保留（与 2.3.8 的
+`sidebar.usage.plan.upgrade` 同口径：删入口不删文案，避免合并冲突）。
+
+**上游 E2E 偏差**：`packages/desktop/test/e2e/ui-shell/marketing-touch-rewards.test.ts` 的
+REF-02/03/04 仍按 `rewards-menu-item` 断言（且还断言 2.3.8 已删除的升级按钮）。这是上游 E2E
+与本地 UI 的既有偏差，与 2.3.8 同类；不要为了它恢复菜单入口。
+
+#### 2.3.10 标题展开菜单移除「反馈问题」入口（2026-10-30）
+
+`packages/ui/src/WorkspaceHeaderSections.tsx` 不再向 `TaskActionMenuContent` 传
+`onOpenTaskFeedback`，并删除只服务该入口的 `handleOpenTaskFeedback`、`openFeedbackSubmit` 与
+`useFeedbackStore` / `buildTaskFeedbackDescription` 导入。
+
+`TaskActionMenuContent` 的 `onOpenTaskFeedback` 可选 prop 保留：任务列表右键菜单
+（`TaskListItem*`、`project-sidebar/grouped/task-context-menu-content.tsx`）仍保留各自的反馈入口，
+不在本次改动范围。`taskList.feedback` / `taskList.feedbackOpened` 文案保留（后者可能被其他路径引用）。
+
 ### 2.4 启动与桌面行为
 
 #### 2.4.1 启动强制升级 gate 已禁用
