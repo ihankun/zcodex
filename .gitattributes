@@ -31,3 +31,8 @@ third-party/inventory.json linguist-generated=true
 
 # Gen UI vendor 快照带 sha256 清单，构建时逐字节校验；autocrlf 改写换行会误报漂移，按字节保真。
 apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/** -text
+
+# dist-types 是 tsc 以 LF 生成并入库的声明产物。core.autocrlf=true 会把检出转成 CRLF，
+# 打包重新生成又变回 LF：内容完全相同（git diff 为空），但 index 缓存的 size 变了，
+# git status 会把它们误报为已修改。固定 LF 后检出与生成同尺寸，打包不再产生假变更。
+apps/zcode-cli/packages/*/dist-types/** text eol=lf
