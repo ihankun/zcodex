@@ -865,6 +865,13 @@ Vitest（`scripts/engineering-test-files.json`，入口 `pnpm test:engineering` 
   - **不要用 `grep -oE '^\s*"[^"]+":'` 之类的正则提 key**（BSD grep 的 `-o` 在该模式上会漏匹配，
     本次两次得出错误结论）；同理 `comm` 必须 `LC_ALL=C sort` 且两侧一致，否则大量假阳性。
     用第六节 ⑦ 的 `pnpm i18n:check`。
+- **整取上游 locale 不只丢 key，还会覆盖 fork 改过的 value（2026-10-30 实测）。**
+  `pnpm i18n:check` ①/② 只校验 key 是否存在；v3.17.1 合并按「取上游 + 补回缺失 key」处理后，
+  fork 之前改过的 **120 条中文 / 117 条英文**品牌文案（`ZCode`→`ZCodex`、`~/.zcode`→`~/.zcodex`）
+  被上游原文覆盖，界面回到「关于 ZCode」。修复方式：以合并前 dev tip 为基线，对基线里含
+  `ZCodex`/`.zcodex` 的 key，把当前上游 value 重新做同样的品牌替换（保留上游新措辞），
+  而不是整条取回旧 value。检查脚本已加 ②b：基线品牌值被覆盖会逐条列出（`--fail-on-lost` 可转失败）。
+  注意 `readFlatEntries` 同时支持单引号值（英文 MCP 额度提示就是单引号，旧解析会漏）。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
@@ -967,7 +974,8 @@ pnpm test:engineering packages/desktop/scripts/gen-ui-runtime-assets.test.ts
 # ⑦ i18n key 覆盖（合并整取上游 locale 时的静默丢失口，见第三节）
 #    ① 代码里 `id: "xxx.yyy"` 的引用必须在两个 locale（含 request-security-edition 兜底表）里
 #      存在；② 传 --baseline 时列出「基线有、现在没有」的 key，逐条判断 fork 新增（必须补回）
-#      还是上游删除（忽略）。
+#      还是上游删除（忽略）；②b 列出「基线值含 ZCodex/.zcodex、当前值又回到 ZCode/.zcode」的
+#      key——整取上游会覆盖 fork 改过的 value，必须逐条恢复品牌替换（见第三节）。
 pnpm i18n:check
 pnpm i18n:check -- --baseline <合并前的 dev tip>
 # 基线（2026-10-30 实测）：① 3054 个 id 全部可解析；② 相对合并前 ab519c43，

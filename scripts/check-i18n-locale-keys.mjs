@@ -57,6 +57,34 @@ function readFlatKeys(text) {
   return keys;
 }
 
+/**
+ * key → value。value 可能是双引号或单引号（英文里带撇号的句子常用单引号），
+ * 也可能把值写在 key 的下一行；这里一并支持，用于比对品牌文案是否被上游覆盖。
+ */
+function readFlatEntries(text) {
+  const entries = new Map();
+  const pattern =
+    /^\s*"([^"]+)":\s*(?:\r?\n\s*)?(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/gm;
+  for (const match of text.matchAll(pattern)) {
+    entries.set(match[1], match[2] ?? match[3]);
+  }
+  return entries;
+}
+
+function readEntriesFromFile(relativePath) {
+  return readFlatEntries(readFileSync(join(repoRoot, relativePath), "utf8"));
+}
+
+function readEntriesFromGit(rev, relativePath) {
+  return readFlatEntries(
+    execFileSync("git", ["show", `${rev}:${relativePath}`], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 1 << 30,
+    }),
+  );
+}
+
 function readKeysFromFile(relativePath) {
   return readFlatKeys(readFileSync(join(repoRoot, relativePath), "utf8"));
 }
@@ -174,14 +202,39 @@ if (baselineRev) {
     );
     if (!lost.length) {
       console.log("  无 key 丢失");
-      continue;
+    } else {
+      console.error(`  基线里有、现在没有（${lost.length} 条，逐条判断 fork 新增还是上游删除）：`);
+      for (const key of lost) {
+        console.error(`    ${key}`);
+      }
+      if (failOnLost) {
+        failed = true;
+      }
     }
-    console.error(`  基线里有、现在没有（${lost.length} 条，逐条判断 fork 新增还是上游删除）：`);
-    for (const key of lost) {
-      console.error(`    ${key}`);
+
+    // ②b 只比对 key 不够：整取上游会把 fork 改过的 value 一起覆盖回去。
+    // 基线里带 ZCodex/.zcodex 的 key，如果现在的 value 又出现 ZCode/.zcode，逐条报出来。
+    const baselineEntries = readEntriesFromGit(baselineRev, path);
+    const currentEntries = readEntriesFromFile(path);
+    const oldBrandPattern = /ZCode(?!x)|\.zcode(?![A-Za-z0-9_-])/u;
+    const lostBrandValues = [];
+    for (const [key, baselineValue] of baselineEntries) {
+      const currentValue = currentEntries.get(key);
+      if (currentValue === undefined) continue;
+      if (!/ZCodex|\.zcodex/u.test(baselineValue)) continue;
+      if (!oldBrandPattern.test(currentValue)) continue;
+      lostBrandValues.push({ key, baselineValue, currentValue });
     }
-    if (failOnLost) {
-      failed = true;
+    if (lostBrandValues.length) {
+      console.error(
+        `  基线品牌值被覆盖（${lostBrandValues.length} 条，逐条确认上游是否重写文案）：`,
+      );
+      for (const { key, baselineValue, currentValue } of lostBrandValues) {
+        console.error(`    ${key}: ${currentValue}  <- ${baselineValue}`);
+      }
+      if (failOnLost) {
+        failed = true;
+      }
     }
   }
 }
