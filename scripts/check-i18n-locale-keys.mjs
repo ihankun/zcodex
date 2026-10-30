@@ -93,7 +93,9 @@ function collectSourceFiles() {
         walk(absolutePath);
         continue;
       }
-      const relativePath = relative(repoRoot, absolutePath);
+      // 统一成正斜杠再匹配：Node 的 path.relative 在 Windows 上给反斜杠，
+      // 直接 `includes("/xxx/")` 会漏掉下面三类排除，把协议 id 当成缺失文案误报。
+      const relativePath = relative(repoRoot, absolutePath).replaceAll("\\", "/");
       if (![".ts", ".tsx"].includes(extname(entry))) continue;
       if (relativePath.includes("/i18n/locales/")) continue;
       if (relativePath.includes("/request-security-edition/")) continue;

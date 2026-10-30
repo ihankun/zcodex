@@ -3,7 +3,14 @@ import {
   TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER,
   TID_WORKSPACE_HELP_MENU_TRIGGER,
 } from "@zcode/shared/test-ids";
-import { ActivityIcon, CircleHelpIcon, DownloadIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  CircleHelpIcon,
+  CopyIcon,
+  DownloadIcon,
+  InfoIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge.js";
 import { Button } from "@/components/ui/button.js";
 import {
@@ -17,8 +24,9 @@ import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import { useDesktopUpdateMenu } from "@/hooks/useDesktopUpdateMenu.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
-import { createHelpMenuActionHandlers } from "@/lib/helpMenuActions.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import { createHelpMenuActionHandlers } from "@/lib/helpMenuActions.js";
+import { toast } from "@/components/ui/toast.js";
 
 export function WorkspaceHelpMenuButton({
   className,
@@ -47,6 +55,19 @@ export function WorkspaceHelpMenuButton({
 
   const handleShowAbout = () => {
     void platform.executeDesktopCommand(DesktopCommandIds.ShowAbout);
+  };
+
+  const handleCopyDeviceMid = async () => {
+    try {
+      const deviceMid = platform.getDeviceId();
+      if (!deviceMid || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(deviceMid);
+      toast(intl.formatMessage({ id: "workspaceHeader.help.deviceMidCopied" }));
+    } catch {
+      toast(intl.formatMessage({ id: "workspaceHeader.help.deviceMidCopyFailed" }));
+    }
   };
 
   // 本地定制：产品文档 / 用户社群 / 问题上报 / 给产品提需求 四项已从菜单移除
@@ -86,6 +107,10 @@ export function WorkspaceHelpMenuButton({
         <DropdownMenuItem onSelect={helpMenuActions.exportLogs}>
           <DownloadIcon className="size-4" />
           {intl.formatMessage({ id: "titleBar.menu.help.exportLogs" })}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={handleCopyDeviceMid}>
+          <CopyIcon className="size-4" />
+          {intl.formatMessage({ id: "workspaceHeader.help.copyDeviceMid" })}
         </DropdownMenuItem>
         {/* Windows/Linux 没有原生菜单栏，自绘标题栏箭头菜单也已下线，
             资源管理器只能从这里进。 */}
