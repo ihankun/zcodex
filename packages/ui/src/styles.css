@@ -73,6 +73,16 @@ body,
   background: transparent !important;
 }
 
+/*
+ * Windows 窗口特效：只有用户选择亚克力/云母时根节点才带 window-effect-*。
+ * 外壳（侧边栏 + 内容面板外沿留白）改用半透明 token 透出 DWM 材质；
+ * 内容面板的 bg-background 不受影响。未分层规则优先于 Tailwind utilities。
+ */
+.window-effect-acrylic [data-desktop-window-frame="true"],
+.window-effect-mica [data-desktop-window-frame="true"] {
+  background-color: var(--color-background-alt);
+}
+
 :root {
   --shadow-composer-soft: 0 0 #0000;
   --ui-font-size: 14px;

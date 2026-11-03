@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { DesktopWindowChromeState, IPlatformService, UpdateStatePayload } from "@zcode/shared";
+import type {
+  DesktopWindowChromeState,
+  DesktopWindowEffect,
+  IPlatformService,
+  UpdateStatePayload,
+} from "@zcode/shared";
 import { logger } from "@/logger.js";
+import { applyWindowEffectClass } from "@/useTheme.js";
 import { toast } from "@/components/ui/toast.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
@@ -127,6 +133,13 @@ export function useAppChromeState({
   }, [isDesktop, platform]);
 
   useEffect(() => {
+    if (!desktopWindowChromeState) return;
+    // main 是当前生效窗口特效的唯一来源；启动首帧由 main.tsx 的 bootstrap 先同步一次，
+    // 这里只处理运行期切换（设置页写入后 main 广播 chrome state）。
+    applyWindowEffectClass(desktopWindowChromeState.windowEffect);
+  }, [desktopWindowChromeState]);
+
+  useEffect(() => {
     const isLinuxDesktop = isDesktop && !isMacDesktop && !isWindowsDesktop;
     const rootElement = document.documentElement;
     if (!rootElement) return;
@@ -240,5 +253,61 @@ export function useAppChromeState({
     updateReadyVersion,
     updateState,
     sidebarContainerRef,
+  };
+}
+
+/**
+ * 设置页专用：读取 main 当前生效的窗口特效与系统能力，并同步根节点 class。
+ *
+ * 设置页和主工作区可能不同时挂载，因此这里也负责运行期 class 同步；
+ * 数据来源与 useAppChromeState 相同，renderer 不维护可写的特效副本。
+ */
+export function useDesktopWindowEffect({
+  enabled,
+  platform,
+}: {
+  enabled: boolean;
+  platform: IPlatformService;
+}): { windowEffect: DesktopWindowEffect; supportsWindowEffect: boolean } {
+  const [state, setState] = useState<DesktopWindowChromeState | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !platform.getDesktopWindowChromeState) {
+      applyWindowEffectClass("default");
+      setState(null);
+      return;
+    }
+
+    let disposed = false;
+    let eventRevision = 0;
+    const dispose = platform.onDesktopWindowChromeStateChanged?.((next) => {
+      eventRevision += 1;
+      setState(next);
+    });
+    const requestRevision = eventRevision;
+
+    // 与 useAppChromeState 相同的“先订阅再查询 + revision”策略，
+    // 避免较慢的首查覆盖设置页切换后更晚到达的事件。
+    void platform.getDesktopWindowChromeState().then(
+      (next) => {
+        if (!disposed && eventRevision === requestRevision) setState(next);
+      },
+      (error) => logger.warn("[app-chrome] 同步窗口特效失败", { error }),
+    );
+
+    return () => {
+      disposed = true;
+      dispose?.();
+    };
+  }, [enabled, platform]);
+
+  useEffect(() => {
+    if (!state) return;
+    applyWindowEffectClass(state.windowEffect);
+  }, [state]);
+
+  return {
+    windowEffect: state?.windowEffect ?? "default",
+    supportsWindowEffect: state?.supportsWindowEffect ?? false,
   };
 }

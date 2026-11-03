@@ -7,6 +7,7 @@ import {
   AppErrorBoundary,
   Root,
   GlobalDatabaseStartupLoading,
+  applyWindowEffectClass,
   UpdateStatusWindowRoot,
   ZCodeIntlProvider,
   registerBaseWorkspaceServices,
@@ -141,6 +142,14 @@ const initialLocale: Locale =
   initialLocaleFlag === "zh-CN" || initialLocaleFlag === "en-US"
     ? initialLocaleFlag
     : DEFAULT_LOCALE;
+// main 在创建窗口时把有效窗口特效写入 bootstrap query；在 React 渲染前同步根节点 class，
+// 避免首帧外壳先实色、等 chrome state 返回后才切成半透明的闪烁。
+const windowEffectFlag = readStringFlag("windowEffect");
+applyWindowEffectClass(
+  isWindowsDesktop && (windowEffectFlag === "acrylic" || windowEffectFlag === "mica")
+    ? windowEffectFlag
+    : "default",
+);
 let baseServicesForRemoteSessions: IServiceAccessor | null = null;
 const pendingRemoteWorkspaceServicePorts: RemoteWorkspaceServicePortRegistration[] = [];
 

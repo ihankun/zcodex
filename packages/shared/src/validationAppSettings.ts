@@ -48,6 +48,12 @@ const zcodeInteractionBehaviorSchema = z.enum(["queue", "guide"]);
 const dynamicWorkflowModeSettingSchema = z.enum(DYNAMIC_WORKFLOW_MODES).optional().catch(undefined);
 const electronReleaseChannelSchema = z.enum(["stable", "preview"]);
 const desktopZoomLevelSchema = z.number().int().min(-3).max(5);
+// 读文件时坏值只回退该字段：与 dynamicWorkflowModeSettingSchema 一致，
+// 不能让一个窗口外观偏好把整份 setting.json 读回默认。
+const desktopWindowEffectSettingSchema = z
+  .enum(["default", "acrylic", "mica"])
+  .optional()
+  .catch("default");
 const desktopWindowSizeSchema = z.object({
   width: z.number().int().min(480),
   height: z.number().int().min(640),
@@ -535,6 +541,7 @@ const appSettingsObjectSchema = z.object({
   desktopZoomLevel: desktopZoomLevelSchema.optional(),
   desktopWindowSize: desktopWindowSizeSchema.optional(),
   desktopChromiumHardwareAccelerationEnabled: z.boolean().default(true),
+  desktopWindowEffect: desktopWindowEffectSettingSchema,
   messageStreamShowReasoning: z.boolean().default(true),
   messageStreamShowReasoningMigrationInitialized: z.boolean().default(true),
   messageStreamShowTodos: z.boolean().default(false),
@@ -631,6 +638,7 @@ export const appSettingsPatchSchema = z.object({
   desktopZoomLevel: desktopZoomLevelSchema.optional(),
   desktopWindowSize: desktopWindowSizeSchema.optional(),
   desktopChromiumHardwareAccelerationEnabled: z.boolean().optional(),
+  desktopWindowEffect: z.enum(["default", "acrylic", "mica"]).optional(),
   messageStreamShowReasoning: z.boolean().optional(),
   messageStreamShowReasoningMigrationInitialized: z.boolean().optional(),
   messageStreamShowTodos: z.boolean().optional(),

@@ -76,6 +76,7 @@ import {
   desktopMenuMessageIds,
   type Locale,
   type AppSettings,
+  type DesktopWindowEffect,
   type appSettingsPatchSchema,
   PlatformChannels,
   ZCODE_ENV,
@@ -159,7 +160,8 @@ import { maybeWarnArchitectureMismatch } from "./desktopArchitectureGuard.js";
 // 本地定制：保留 applyAppIcon（Dock 图标只在未打包态覆盖，见笔记 2.4.2）；
 // 上游 v3.15.1 把 createWindowsDesktopTray 改名为 createDesktopTray 并新增 tray 能力探测，采用上游；
 // 刻意**不**导入 maybeBlockStartupForForceUpdate——启动强制升级 gate 已禁用（笔记 2.4.1），不要恢复。
-import { applyAppIcon } from "./desktopWindowChrome.js";
+import { applyAppIcon, applyWindowsWindowEffect } from "./desktopWindowChrome.js";
+import { resolveEffectiveDesktopWindowEffect } from "./desktopWindowChromeState.js";
 import { createDesktopTray, updateWindowsDesktopTrayMenu } from "./desktopTray.js";
 import {
   createCloseToTrayCapabilityMonitor,
@@ -583,6 +585,8 @@ async function runBrowserCommandOnView(params: {
 }
 let currentDesktopZoomLevel = 0;
 let currentDesktopWindowSize: DesktopWindowSize | undefined;
+// 窗口背景特效的 main 进程投影；持久化事实仍是 setting.json 的 desktopWindowEffect。
+let currentDesktopWindowEffect: DesktopWindowEffect = "default";
 const preloadPath = join(import.meta.dirname, "../preload/index.cjs");
 const settingsFile = join(homedir(), ".zcodex", "v2", "setting.json");
 let activeAppShutdownPolicy = resolveAppShutdownPolicy("normal", process.platform);
@@ -1197,6 +1201,22 @@ function syncImmediateAppSettings(patch: ReturnType<typeof appSettingsPatchSchem
       patch.receivePreviewUpdates,
       "settings receivePreviewUpdates changed",
     );
+  }
+
+  if (patch.desktopWindowEffect !== undefined) {
+    // 窗口特效落盘已由 host 完成；main 只负责把有效值投影到原生窗口和 renderer。
+    // 不支持的平台/构建统一收敛为 default，避免 renderer 外壳半透明后露出黑底。
+    currentDesktopWindowEffect = resolveEffectiveDesktopWindowEffect(patch.desktopWindowEffect);
+    for (const win of getMainApplicationWindows()) {
+      applyWindowsWindowEffect(win, currentDesktopWindowEffect, logger);
+    }
+    // 其他窗口的设置快照跟随刷新；与 shortcutBindings 一样由 main 统一广播，
+    // 避免只有发起写入的窗口收到新值。
+    for (const win of getApplicationWindowsExcludingCuaIndicator()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(PlatformChannels.SettingsChanged);
+      }
+    }
   }
 
   if (patch.shortcutBindings !== undefined) {
@@ -2082,6 +2102,8 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
     runtimeProcessEnvFallbackPatch: runtimeProcessEnvPreparation.fallbackPatch,
     initialDesktopZoomLevel: currentDesktopZoomLevel,
     initialWindowSize: currentDesktopWindowSize,
+    initialWindowEffect: currentDesktopWindowEffect,
+    getWindowEffect: () => currentDesktopWindowEffect,
     currentApplicationLocale: () => currentApplicationLocale,
     resolveBrowserViewOwner: (webContentsId) =>
       browserGuestManager.getTabOwnerByWebContentsId(webContentsId) ?? undefined,
@@ -2228,6 +2250,9 @@ app.whenReady().then(async () => {
     keepAwakeWhileRunning = bootstrapSettings.keepAwakeWhileRunning ?? false;
     currentDesktopZoomLevel = clampDesktopZoomLevel(bootstrapSettings.desktopZoomLevel ?? 0);
     currentDesktopWindowSize = bootstrapSettings.desktopWindowSize;
+    currentDesktopWindowEffect = resolveEffectiveDesktopWindowEffect(
+      bootstrapSettings.desktopWindowEffect ?? "default",
+    );
     // 全局 keep-awake：启动时若设置已开，立刻持有 powerSaveBlocker，不必等设置变更事件。
     reconcileKeepAwakeBlocker();
   } catch {
@@ -2502,6 +2527,7 @@ app.whenReady().then(async () => {
       void webRemoteControlManager.restorePreviouslyEnabled(windowId, workspaces);
     },
     syncAppSettings: syncImmediateAppSettings,
+    getWindowEffect: () => currentDesktopWindowEffect,
     // 设置页置灰查询：monitor 带 stale 缓存，装完 AppIndicator 扩展重开设置页即可刷新。
     // 设置页置灰查询：先确保托盘实例就绪（用户装扩展后首次查询会补建），再返回合并了
     // trayReady 的最终能力，避免设置页显示可开启但关窗实际走确认退出的不一致（CR-01）。

@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { ModelConfig, ModelOptionSpecsConfig } from "@zcode/provider";
 import { NodePersonalProviderConfigRepository } from "@zcode/provider-node";
 import { join } from "node:path";
@@ -44,6 +44,26 @@ const REORDER_MODEL_IDS = ["e2e-reorder-first", "e2e-reorder-second"] as const;
 const REASONING_EDITOR_PROVIDER_ID = "e2e-reasoning-editor-provider";
 const REASONING_EDITOR_MODEL_ID = "gateway/team/glm-5.3-20260907";
 const DELETE_PROVIDER_ID = "e2e-delete-provider";
+
+// 本 fork 的 App 数据根是 .zcodex；E2E helper 的 readSettings() 仍指向历史 .zcode，
+// 这里按 App 实际写入路径读取，避免断言读到空文件。
+const E2E_SETTINGS_FILE = join(
+  process.env.ZCODE_E2E_HOME_DIR?.trim() || join(process.cwd(), ".e2e-home"),
+  ".zcodex",
+  "v2",
+  "setting.json",
+);
+
+async function readPersistedWindowEffect(): Promise<string | undefined> {
+  try {
+    const parsed = JSON.parse(await readFile(E2E_SETTINGS_FILE, "utf-8")) as {
+      desktopWindowEffect?: string;
+    };
+    return parsed.desktopWindowEffect;
+  } catch {
+    return undefined;
+  }
+}
 
 describe("设置页 UI polish E2E", () => {
   after(async () => {
@@ -237,6 +257,95 @@ describe("设置页 UI polish E2E", () => {
         };
       }),
     ).toEqual({ sidebarWidth: 268, contentOffset: 268, gap: 0 });
+  });
+
+  it("UP-03: Windows 窗口特效只改变外壳透明度", async () => {
+    if (process.platform !== "win32") return;
+
+    await clickTestIdByDom(TID_TASK_SETTINGS_BUTTON, { timeout: 15000 });
+    await $(sel(TID_SETTINGS_PAGE)).waitForDisplayed({ timeout: 15000 });
+    await clickTestIdByDom(testId(TID_SETTINGS_SECTION_NAV, "appearance"), {
+      timeout: 15000,
+    });
+
+    const readBackgrounds = () =>
+      browser.execute(() => {
+        const frame = document.querySelector<HTMLElement>('[data-desktop-window-frame="true"]');
+        const content = document.querySelector<HTMLElement>('[data-settings-panel-frame="true"]');
+        const resolveUtilityColor = (className: string) => {
+          const reference = document.createElement("div");
+          reference.className = className;
+          document.body.append(reference);
+          const color = getComputedStyle(reference).backgroundColor;
+          reference.remove();
+          return color;
+        };
+        return {
+          frame: frame ? getComputedStyle(frame).backgroundColor : null,
+          content: content ? getComputedStyle(content).backgroundColor : null,
+          translucent: resolveUtilityColor("bg-background-alt"),
+          opaqueShell: resolveUtilityColor("bg-background-win-alt"),
+          opaqueContent: resolveUtilityColor("bg-background"),
+        };
+      });
+
+    const trigger = $('[data-testid="settings-window-effect-select"]');
+    if (!(await trigger.isExisting())) {
+      // Windows 10/Windows 11 21H2 不支持 DWM system backdrop：设置行必须隐藏，
+      // 外壳保持改动前的实色，不能因为残留设置切成半透明后露出黑底。
+      const unsupported = await readBackgrounds();
+      expect(unsupported.frame).toBe(unsupported.opaqueShell);
+      expect(unsupported.content).toBe(unsupported.opaqueContent);
+      return;
+    }
+
+    try {
+      await trigger.click();
+      await browser.waitUntil(
+        async () => (await $$('[role="option"]').length) >= 3,
+        { timeout: 10000, timeoutMsg: "窗口特效下拉没有展开" },
+      );
+      // WINDOW_EFFECT_MODES 固定为 default / acrylic / mica，按索引选择避免绑定当前 UI 语言。
+      await $$('[role="option"]')[2]!.click();
+
+      await browser.waitUntil(
+        () =>
+          browser.execute(() =>
+            document.documentElement.classList.contains("window-effect-mica"),
+          ),
+        { timeout: 10000, timeoutMsg: "根节点没有切换到云母 class" },
+      );
+      const mica = await readBackgrounds();
+      expect(mica.frame).toBe(mica.translucent);
+      expect(mica.content).toBe(mica.opaqueContent);
+
+      await browser.waitUntil(
+        async () => (await readPersistedWindowEffect()) === "mica",
+        { timeout: 10000, timeoutMsg: "窗口特效没有写入 setting.json" },
+      );
+    } finally {
+      await $('[data-testid="settings-window-effect-select"]').click();
+      await browser.waitUntil(
+        async () => (await $$('[role="option"]').length) >= 3,
+        { timeout: 10000, timeoutMsg: "窗口特效下拉没有重新展开" },
+      );
+      await $$('[role="option"]')[0]!.click();
+
+      await browser.waitUntil(
+        () =>
+          browser.execute(
+            () => !document.documentElement.classList.contains("window-effect-mica"),
+          ),
+        { timeout: 10000, timeoutMsg: "根节点没有恢复到默认 class" },
+      );
+      const restored = await readBackgrounds();
+      expect(restored.frame).toBe(restored.opaqueShell);
+      expect(restored.content).toBe(restored.opaqueContent);
+      await browser.waitUntil(
+        async () => (await readPersistedWindowEffect()) === "default",
+        { timeout: 10000, timeoutMsg: "窗口特效没有恢复默认值" },
+      );
+    }
   });
 
   async function readVisibleProfileMenuItems() {

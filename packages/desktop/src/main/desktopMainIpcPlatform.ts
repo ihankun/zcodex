@@ -13,6 +13,7 @@ import {
   stringArraySchema,
   webRemoteControlWorkspaceTargetsSchema,
   type DesktopCommandId,
+  type DesktopWindowEffect,
   type ApplicationIconRequest,
   type Locale,
   type LoadCliMcpFromUserDirectoryRequest,
@@ -42,7 +43,7 @@ import { registerResourceManagerNetworkIpc } from "./resourceManagerNetwork.js";
 import { applyWindowsTitleBarTheme, getWindowOverlayTheme } from "./desktopWindowChrome.js";
 import { syncWindowControlsOverlayForZoomLevel } from "./desktopWindowButtonPosition.js";
 import { resolveDesktopZoomLevelFromFactor } from "./desktopZoom.js";
-import { resolveDesktopWindowChromeState } from "./desktopWindowChromeState.js";
+import { resolveCurrentDesktopWindowChromeState } from "./desktopWindowChromeState.js";
 import { handleWindowUnreadCountSync } from "./desktopWindowLifecycle.js";
 import { captureWindowScreenshot, openPathInFileManager } from "./desktopMainIpcHelpers.js";
 import { registerCuaPermissionIpcHandlers } from "./desktopCuaPermissionIpc.js";
@@ -101,6 +102,8 @@ export function registerPlatformIpcHandlers(options: {
   }>;
   setAutoDownloadAndInstallUpdates: (enabled: boolean) => Promise<void>;
   syncAppSettings: (patch: ReturnType<typeof appSettingsPatchSchema.parse>) => void;
+  /** main 进程当前生效的窗口背景特效；与 AppSettings 的持久化值分开，非支持平台为 default。 */
+  getWindowEffect: () => DesktopWindowEffect;
   /** 关闭驻留托盘能力查询（spec：docs/desktop/linux-close-to-tray.md）；传入 monitor 的 refresh */
   refreshCloseToTrayCapability: () => Promise<import("@zcode/shared").DesktopCloseToTrayCapability>;
   /** 快捷键设置页录制态开关：true 时 main 重建菜单摘除可配置 accelerator（见 shortcut-settings-spec §7） */
@@ -433,7 +436,10 @@ export function registerPlatformIpcHandlers(options: {
   });
   ipcMain.handle(PlatformChannels.GetDesktopWindowChromeState, (event) => {
     const senderWindow = BrowserWindow.fromWebContents(event.sender);
-    return resolveDesktopWindowChromeState(senderWindow?.isMaximized() ?? false);
+    return resolveCurrentDesktopWindowChromeState(
+      senderWindow?.isMaximized() ?? false,
+      options.getWindowEffect(),
+    );
   });
   ipcMain.handle(PlatformChannels.GetInstalledEditors, (_event, filePath?: string) =>
     getInstalledEditors(typeof filePath === "string" ? filePath : undefined),

@@ -57,6 +57,7 @@ export const SETTINGS_USER_ACTION_FEATURES = {
   "settings.locale": ["change_locale"],
   "settings.appearance": [
     "change_theme",
+    "change_window_effect",
     "change_ui_font_size",
     "change_code_light_theme",
     "change_code_dark_theme",

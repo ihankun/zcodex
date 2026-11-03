@@ -1,4 +1,5 @@
 import type { Theme } from "@/useTheme.js";
+import type { DesktopWindowEffect } from "@zcode/shared";
 import { useState } from "react";
 import { resolveTheme } from "@/useTheme.js";
 import { Card, CardContent } from "@/components/ui/card.js";
@@ -20,7 +21,7 @@ import {
 import { getCodePreviewTheme } from "@/lib/codePreviewPreferences.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import type { CodePreviewSettings } from "@/store/index.js";
-import { THEME_MODES } from "@/settings/settingsPageConfig.js";
+import { THEME_MODES, WINDOW_EFFECT_MODES } from "@/settings/settingsPageConfig.js";
 import { MAX_UI_FONT_SIZE_PX, MIN_UI_FONT_SIZE_PX } from "@/lib/uiFontSize.js";
 
 function FontSizeInput({
@@ -85,6 +86,10 @@ export function AppearanceSectionContent({
   setTheme,
   uiFontSizePx,
   setUiFontSizePx,
+  isWindowsDesktop = false,
+  supportsWindowEffect = false,
+  windowEffect = "default",
+  onWindowEffectChange,
 }: {
   codePreviewSettings: CodePreviewSettings;
   setCodePreviewSettings: (settings: Partial<CodePreviewSettings>) => void;
@@ -92,6 +97,10 @@ export function AppearanceSectionContent({
   setTheme: (theme: Theme) => void;
   uiFontSizePx: number;
   setUiFontSizePx: (fontSizePx: number) => void;
+  isWindowsDesktop?: boolean;
+  supportsWindowEffect?: boolean;
+  windowEffect?: DesktopWindowEffect;
+  onWindowEffectChange?: (effect: DesktopWindowEffect) => void;
 }) {
   const { intl } = useZCodeIntl();
   const activePreviewMode = resolveTheme(theme);
@@ -152,6 +161,39 @@ export function AppearanceSectionContent({
                 />
               }
             />
+            {isWindowsDesktop && supportsWindowEffect ? (
+              <SettingsRow
+                label={intl.formatMessage({ id: "settings.windowEffect" })}
+                description={intl.formatMessage({
+                  id: "settings.windowEffectDescription",
+                })}
+                control={
+                  <Select
+                    value={windowEffect}
+                    onValueChange={(value) =>
+                      onWindowEffectChange?.(value as DesktopWindowEffect)
+                    }
+                  >
+                    <SelectTrigger
+                      size="lg"
+                      className="w-[260px] min-w-0 justify-between"
+                      data-testid="settings-window-effect-select"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WINDOW_EFFECT_MODES.map((mode) => (
+                        <SelectItem key={mode} value={mode}>
+                          {intl.formatMessage({
+                            id: `settings.windowEffect.${mode}`,
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                }
+              />
+            ) : null}
           </CardContent>
         </Card>
       </div>

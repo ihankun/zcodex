@@ -156,3 +156,9 @@ UP-01 在 macOS 上增加 `DesktopWindowFrame` 计算背景透明断言。这是
 - Windows/Linux/Web 背景分支已做单测，未做独立平台视觉验证；设置页和错误页复用同一组件，未逐页截图验证。
 
 2026-10-09 平台尺寸：UP-00 Windows 设置页 6px 外沿、8px 圆角和右上操作组对齐通过，run `desktop-e2e-20261009070918592-p12424-e7971ff15e21066b`。
+
+## 2026-11-03 窗口特效（UP-03）
+
+UP-03 验证 Windows 设置页“窗口特效”行：切到云母后 `html.window-effect-mica` 生效、`DesktopWindowFrame` 计算背景等于 `bg-background-alt`、设置内容面板仍为 `bg-background`，`setting.json` 写入 `desktopWindowEffect: "mica"`；切回默认后 class 移除、外壳恢复 `bg-background-win-alt`、设置文件恢复 `"default"`。DWM 原生材质无法从 Electron 读回，亚克力/云母的实际观感仍需 Windows 11 22H2+ 人工确认；UP-03 在非 Windows 提前返回。
+
+Windows 11 24H2 (10.0.26300) Electron：UP-03 1/1 passed，run `desktop-e2e-20261103-043218-273`。

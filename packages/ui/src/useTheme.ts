@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import type { DesktopWindowEffect } from "@zcode/shared";
 
 export type Theme = "light" | "dark" | "zai-light" | "zai-dark" | "system";
 export type ResolvedTheme = "light" | "dark";
@@ -53,6 +54,18 @@ function syncBrowserThemeSurface(resolved: ResolvedTheme) {
   if (background) {
     setThemeMetaContent("theme-color", background);
   }
+}
+
+/**
+ * 同步 Windows 窗口材质对应的根节点 class。
+ *
+ * DWM system backdrop 只能从窗口层透出；renderer 只在用户选择亚克力/云母时把
+ * DesktopWindowFrame 根表面切成半透明。default 不保留 class，保持改动前的实色外壳。
+ */
+export function applyWindowEffectClass(effect: DesktopWindowEffect) {
+  const root = document.documentElement;
+  root.classList.toggle("window-effect-acrylic", effect === "acrylic");
+  root.classList.toggle("window-effect-mica", effect === "mica");
 }
 
 export function applyTheme(theme: Theme) {

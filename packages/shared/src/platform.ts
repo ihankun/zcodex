@@ -27,7 +27,7 @@ import type {
   WebRemoteControlRendererActionRequest,
   WebRemoteControlRendererActionResult,
 } from "#src/web-remote-relay/index.js";
-import type { AppSettings, Locale } from "./protocol.js";
+import type { AppSettings, DesktopWindowEffect, Locale } from "./protocol.js";
 import type {
   ArmsCustomEventPayload,
   RendererTelemetryEventPayload,
@@ -483,6 +483,10 @@ export interface DesktopWindowChromeState {
   /** 本机 macOS 主版本；非 macOS 或无法解析时为 null。 */
   macOSMajorVersion?: number | null;
   supportsNativeRoundedCorners: boolean;
+  /** 当前系统是否支持 DWM system backdrop（Windows 11 22H2+）。 */
+  supportsWindowEffect: boolean;
+  /** 当前生效的窗口背景特效；非 Windows 或系统不支持时固定为 default。 */
+  windowEffect: DesktopWindowEffect;
 }
 
 export interface RemoteServiceSession {

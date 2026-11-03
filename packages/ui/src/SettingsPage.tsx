@@ -19,6 +19,7 @@ import {
 import type {
   AppSettings,
   DesktopCloseToTrayCapability,
+  DesktopWindowEffect,
   IntegratedTerminalShellOption,
   IntegratedTerminalShellSelection,
   Locale,
@@ -114,6 +115,7 @@ import { ServiceProvider, useServices } from "@/hooks/useServices.js";
 import type { AppToolSearchMode } from "@zcode/shared";
 import { useSettings } from "@/hooks/useSettingService.js";
 import type { CreateTaskRequest, RemoteConnectionOpenPreference } from "@/app-shell/types.js";
+import { useDesktopWindowEffect } from "@/app-shell/useAppChromeState.js";
 import { useBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { resolveModelProviderConnectivityWorkspacePath } from "@/lib/modelProviderConnectivityTarget.js";
 import {
@@ -336,6 +338,12 @@ export function SettingsPage({
   const isLinuxDesktop = Boolean(isDesktop && !isMacDesktop && !isWindowsDesktop);
   const usesInlineWindowControls = Boolean(isWindowsDesktop || isLinuxDesktop);
   const platform = usePlatform();
+  // 窗口特效只在 Windows 桌面显示；数据来自 main 当前生效值，设置页和主工作区可能不同时挂载，
+  // 因此由这个 hook 负责运行期根节点 class 同步。
+  const { windowEffect, supportsWindowEffect } = useDesktopWindowEffect({
+    enabled: Boolean(isDesktop && isWindowsDesktop),
+    platform,
+  });
   const remoteWorkspaceController = useOptionalRemoteWorkspaceController();
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(() => {
     const initialSection = consumeInitialSettingsSection("general");
@@ -1242,6 +1250,23 @@ export function SettingsPage({
     },
     [localHostServices.settingService, intl],
   );
+  const handleDesktopWindowEffectChange = useCallback(
+    async (effect: DesktopWindowEffect) => {
+      // 写入本地 Host 的设置事实，再由 syncAppSettings 投影到 main 原生窗口；
+      // renderer 不维护第二份可写的特效状态。
+      await runSettingsActionAsync({
+        featureId: "settings.appearance",
+        action: "change_window_effect",
+        trigger: "select",
+        operation: () => updateSharedSettings({ desktopWindowEffect: effect }),
+        completed: {
+          resultSource: "shared_settings",
+          valueAfter: effect,
+        },
+      });
+    },
+    [updateSharedSettings],
+  );
   const handleEmbeddedBrowserAllowInsecureCertificatesChange = useCallback(
     async (enabled: boolean) => {
       await runSettingsActionAsync({
@@ -2061,6 +2086,10 @@ export function SettingsPage({
                                   failureStage: "local_commit",
                                 })
                               }
+                              isWindowsDesktop={Boolean(isWindowsDesktop)}
+                              supportsWindowEffect={supportsWindowEffect}
+                              windowEffect={windowEffect}
+                              onWindowEffectChange={handleDesktopWindowEffectChange}
                             />
                           ) : activeSection === "shortcuts" ? (
                             <ShortcutSettingsSection isDesktop={Boolean(isDesktop)} />

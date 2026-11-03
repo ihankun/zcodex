@@ -6,7 +6,7 @@
 
 ## 实现
 
-- 主窗口在 Windows 上改为 `titleBarStyle: "hidden" + titleBarOverlay`，继续保留 `backgroundMaterial: "acrylic"`。
+- 主窗口在 Windows 上改为 `titleBarStyle: "hidden" + titleBarOverlay`；窗口背景材质由外观设置的“窗口特效”（默认/亚克力/云母）决定，见 `docs/desktop/windows-window-effect.md`。
 - 主进程新增统一的 `executeDesktopCommand` 命令入口，原生应用菜单和 renderer 顶部菜单共用同一套动作实现。
 - UI 在 `WorkspaceHeader` 中按 Windows/Linux 桌面端条件渲染 `WindowsCaptionMenuButton`，通过 `IPlatformService.executeDesktopCommand()` 调用主进程命令。
 - 新任务草稿态不会渲染完整 `WorkspaceHeader`，但 Windows/Linux 桌面端仍需要保留右上角 Terminal 切换按钮和合并菜单按钮。UI 在 shell 外层标题栏区域依次渲染共享的 Terminal 入口与 `WindowsCaptionMenuButton`，只恢复桌面窗口级入口，不恢复 workspace 路径、分支和 task 相关 header 内容。Windows 草稿态合并菜单按钮保持和 session task header 入口一致的尺寸、直角和 hover 样式，但去掉左侧边框，外层不额外绘制 `bg-background-win-alt` 或 `border-b border-border`，避免在透明标题区形成孤立色块。

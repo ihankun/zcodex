@@ -1,4 +1,7 @@
-import type { HostRemoteConversationTelemetryResponse } from "@zcode/shared";
+import type {
+  DesktopWindowEffect,
+  HostRemoteConversationTelemetryResponse,
+} from "@zcode/shared";
 import { ingestToolExecResource } from "./desktopResourceTelemetry.js";
 import { ingestMcpResourceSamples } from "./processResourceMcpTelemetrySource.js";
 /* eslint-disable max-lines -- host process 统一处理 main↔host 生命周期、日志、ZCode Agent，拆分前先保持跨进程消息收口。 */
@@ -73,6 +76,8 @@ export interface WindowBootstrapOptions {
   unavailableWorkspacePath?: string;
   windowKind?: "main" | "update-status";
   locale?: string;
+  /** 主进程当前的窗口背景特效；renderer 在 React 渲染前用它同步根节点 class。 */
+  windowEffect?: DesktopWindowEffect;
 }
 
 export interface HostInitMessage {
@@ -134,6 +139,7 @@ export function loadWindow(
       unavailableWorkspacePath: bootstrap?.unavailableWorkspacePath,
       windowKind: bootstrap?.windowKind,
       locale: bootstrap?.locale,
+      windowEffect: bootstrap?.windowEffect,
     }).filter((entry): entry is [string, string] => entry[1] != null),
   );
 

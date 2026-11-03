@@ -25,6 +25,7 @@ import {
   User,
 } from "lucide-react";
 import { isSettingsSectionEnabled, type SettingsSectionId } from "@/lib/settingsNavigation.js";
+import type { DesktopWindowEffect } from "@zcode/shared";
 import type { Theme } from "@/useTheme.js";
 
 export const THEME_MODES: Array<{
@@ -35,6 +36,8 @@ export const THEME_MODES: Array<{
   { mode: "zai-dark", icon: Moon },
   { mode: "zai-light", icon: Sun },
 ];
+
+export const WINDOW_EFFECT_MODES: readonly DesktopWindowEffect[] = ["default", "acrylic", "mica"];
 
 export type SettingsSectionGroupId = "basics" | "agentCapabilities" | "dataAndStats";
 

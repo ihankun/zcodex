@@ -10,7 +10,7 @@ import type {
   WebContents,
   WindowOpenHandlerResponse,
 } from "electron";
-import type { DesktopTitleBarTheme, Locale } from "@zcode/shared";
+import type { DesktopTitleBarTheme, DesktopWindowEffect, Locale } from "@zcode/shared";
 import {
   DEFAULT_LOCALE,
   desktopMenuMessageIds,
@@ -32,7 +32,7 @@ import {
   resolveDesktopZoomFactorForLevel,
   resolveDesktopZoomLevelFromFactor,
 } from "./desktopZoom.js";
-import { resolveDesktopWindowChromeState } from "./desktopWindowChromeState.js";
+import { resolveCurrentDesktopWindowChromeState } from "./desktopWindowChromeState.js";
 import {
   MIN_DESKTOP_WINDOW_HEIGHT,
   MIN_DESKTOP_WINDOW_WIDTH,
@@ -138,7 +138,15 @@ function isLinuxDesktopWindow() {
   return process.platform === "linux";
 }
 
-function buildDesktopWindowVisualOptions() {
+function resolveWindowsBackgroundMaterial(
+  windowEffect: DesktopWindowEffect,
+): "acrylic" | "mica" {
+  // default 保留现有的 acrylic 窗口材质：renderer 仍是实色外壳，视觉与改动前一致；
+  // 这样启动/加载阶段未绘制 React 时也不会突然露出实色窗底。
+  return windowEffect === "mica" ? "mica" : "acrylic";
+}
+
+function buildDesktopWindowVisualOptions(windowEffect: DesktopWindowEffect = "default") {
   if (process.platform === "darwin") {
     return {
       backgroundColor: "#00000000",
@@ -154,7 +162,7 @@ function buildDesktopWindowVisualOptions() {
       backgroundColor: "#00000000",
       // Windows 窗口操作由 renderer 绘制，禁用原生标题栏，避免出现两套按钮。
       frame: false,
-      backgroundMaterial: "acrylic" as const,
+      backgroundMaterial: resolveWindowsBackgroundMaterial(windowEffect),
     };
   }
 
@@ -197,12 +205,15 @@ function syncWindowFullscreenState(targetWindow: BrowserWindow) {
   );
 }
 
-function syncDesktopWindowChromeState(targetWindow: BrowserWindow) {
+function syncDesktopWindowChromeState(
+  targetWindow: BrowserWindow,
+  windowEffect: DesktopWindowEffect,
+) {
   if (targetWindow.isDestroyed()) return;
 
   targetWindow.webContents.send(
     PlatformChannels.DesktopWindowChromeStateChanged,
-    resolveDesktopWindowChromeState(targetWindow.isMaximized()),
+    resolveCurrentDesktopWindowChromeState(targetWindow.isMaximized(), windowEffect),
   );
 }
 
@@ -229,6 +240,37 @@ export function applyWindowsTitleBarTheme(
   );
 }
 
+export function applyWindowsWindowEffect(
+  targetWindow: BrowserWindow,
+  windowEffect: DesktopWindowEffect,
+  logger?: { warn: (...args: unknown[]) => void },
+) {
+  if (process.platform !== "win32" || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  try {
+    targetWindow.setBackgroundMaterial(resolveWindowsBackgroundMaterial(windowEffect));
+  } catch (error) {
+    logger?.warn("[desktop-window] failed to apply background material", error);
+    return;
+  }
+
+  // 切换 DWM backdrop 后旧合成 surface 可能保留上一帧；复用 show/focus 的有界双帧重绘，
+  // 不 reload renderer、不改窗口尺寸，避免把会话状态一起重置。
+  repaintWindow(targetWindow);
+  setTimeout(() => repaintWindow(targetWindow), 32);
+  syncDesktopWindowChromeState(targetWindow, windowEffect);
+}
+
+function repaintWindow(targetWindow: BrowserWindow) {
+  if (targetWindow.isDestroyed() || targetWindow.webContents.isDestroyed()) {
+    return;
+  }
+
+  targetWindow.webContents.invalidate();
+}
+
 function attachWindowsWindowRepaint(targetWindow: BrowserWindow) {
   if (process.platform !== "win32") {
     return;
@@ -236,11 +278,7 @@ function attachWindowsWindowRepaint(targetWindow: BrowserWindow) {
 
   let pendingRepaintTimer: ReturnType<typeof setTimeout> | null = null;
   const repaint = () => {
-    if (targetWindow.isDestroyed() || targetWindow.webContents.isDestroyed()) {
-      return;
-    }
-
-    targetWindow.webContents.invalidate();
+    repaintWindow(targetWindow);
   };
 
   const scheduleRepaint = () => {
@@ -595,6 +633,10 @@ export function createBrowserWindow(options: {
   initialWindowSize?: DesktopWindowSize;
   /** 每次弹出原生菜单时读取，确保应用切换语言后无需重建窗口。 */
   currentApplicationLocale?: () => Locale;
+  /** 窗口创建时的有效背景特效；同时写入 renderer bootstrap，避免首帧实色闪烁。 */
+  initialWindowEffect?: DesktopWindowEffect;
+  /** 读取当前生效的窗口特效；maximize/unmaximize 重发 chrome state 时使用。 */
+  getWindowEffect?: () => DesktopWindowEffect;
   resolveBrowserViewOwner?: (webContentsId: number) =>
     | {
         workspaceKey: string;
@@ -612,6 +654,8 @@ export function createBrowserWindow(options: {
     primaryWorkArea: screen.getPrimaryDisplay().workArea,
     workAreas: screen.getAllDisplays().map((display) => display.workArea),
   });
+  const initialWindowEffect = options.initialWindowEffect ?? "default";
+  const resolveCurrentWindowEffect = () => options.getWindowEffect?.() ?? initialWindowEffect;
   const win = new BrowserWindow({
     // 有历史位置时按保存的左上角恢复；缺失时交给系统默认放置，保持旧版本行为。
     ...(initialWindowSize.x !== undefined && initialWindowSize.y !== undefined
@@ -626,7 +670,7 @@ export function createBrowserWindow(options: {
     icon: options.iconPath,
     // Linux frameless 后部分桌面环境仍可能显示 Electron 原生菜单栏，自动隐藏避免顶部出现两套菜单。
     autoHideMenuBar: isLinuxDesktopWindow(),
-    ...buildDesktopWindowVisualOptions(),
+    ...buildDesktopWindowVisualOptions(initialWindowEffect),
     webPreferences: {
       preload: options.preloadPath,
       contextIsolation: true,
@@ -668,8 +712,8 @@ export function createBrowserWindow(options: {
   win.on("leave-full-screen", () => {
     syncWindowFullscreenState(win);
   });
-  win.on("maximize", () => syncDesktopWindowChromeState(win));
-  win.on("unmaximize", () => syncDesktopWindowChromeState(win));
+  win.on("maximize", () => syncDesktopWindowChromeState(win, resolveCurrentWindowEffect()));
+  win.on("unmaximize", () => syncDesktopWindowChromeState(win, resolveCurrentWindowEffect()));
   attachWindowsWindowRepaint(win);
   // will-attach 与 did-attach 按顺序配对；队列元素记录 guest 种类，did-attach 据此分派策略。
   const pendingWebviewGuestKinds: Array<
@@ -836,7 +880,9 @@ export function createBrowserWindow(options: {
     Menu.buildFromTemplate(template).popup({ window: win });
   });
 
-  void Promise.resolve(loadWindow(win, "index", options.bootstrap)).catch((error: unknown) => {
+  void Promise.resolve(
+    loadWindow(win, "index", { ...options.bootstrap, windowEffect: initialWindowEffect }),
+  ).catch((error: unknown) => {
     // loadFile/loadURL 返回的导航 Promise 过去被丢弃，长跑中的导航失败
     // 只会表现为 chrome-error 页面，主进程日志没有原始异常可供追踪。
     options.logger.warn("[desktop-window] renderer navigation rejected", error);
