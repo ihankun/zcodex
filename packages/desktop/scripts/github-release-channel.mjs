@@ -60,6 +60,9 @@ export function buildGitHubPreviousReleaseFileUrl(feedUrl, version, fileName) {
  * 同一个 Release 里放不下第二个架构的同名清单——后上传的会覆盖先上传的，
  * 于是另一架构的用户会下载到不匹配的安装包。这里统一改成
  * `<通道>-<平台>-<架构>.yml`，发布脚本按同一规则改名后再上传。
+ *
+ * stable 沿用上游 electron-builder 的 `latest` 通道名，preview 用 `preview`，
+ * 与上游清单命名保持一致。
  */
 export function resolveGitHubReleaseChannelFileStem(options) {
   const channelStem = options.channel === "preview" ? "preview" : "latest";

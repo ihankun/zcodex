@@ -3,10 +3,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 import { withPinnedNodePath } from "./mise-toolchain-env.mjs";
+import { resolvePackagingBuildEnv } from "./packaging-build-env.mjs";
 import { quoteArgsForWindowsShell } from "./spawn-command.mjs";
 
-// 正式版打包固定 production 身份：未显式设置 ZCODE_ENV 时 bundle 会按 fail-safe
-// 落到 Preview 身份并附加 _TEST 产物后缀（见 packages/desktop/scripts/desktop-product-identity.mjs）。
+// 打包入口固定 production 身份并默认开启自动更新（更新源是本仓库的 GitHub Release）。
+// 默认值与优先级见 scripts/packaging-build-env.mjs 与
+// docs/desktop/build-time-optional-capabilities.md。
 const targetOs = process.argv[2]?.trim().toLowerCase();
 if (targetOs !== "mac" && targetOs !== "win" && targetOs !== "linux") {
   console.error("Usage: node scripts/bundle-desktop-env.mjs <mac|win|linux> [arch]");
@@ -25,7 +27,7 @@ const spawnArgs = process.platform === "win32" ? quoteArgsForWindowsShell(bundle
 
 const child = spawn(pnpmCommand, spawnArgs, {
   cwd: repoRoot,
-  env: withPinnedNodePath({ ...process.env, ZCODE_ENV: "production" }, process.execPath),
+  env: withPinnedNodePath(resolvePackagingBuildEnv(process.env), process.execPath),
   stdio: "inherit",
   // Windows .cmd/.bat executables (pnpm.cmd, npm.cmd, etc.) require shell: true
   shell: process.platform === "win32",

@@ -19,6 +19,23 @@
 2. `config/private/build-defaults.json`。只存在于内部仓库，开源导出不包含。
 3. 以上都没有时关闭。
 
+## ZCodex fork：打包入口默认开启自动更新
+
+ZCodex fork 没有内部仓库的 `config/private/build-defaults.json`，更新源是本仓库的 GitHub
+Release（`packages/desktop/src/main/githubReleaseUpdateFeed.ts`）。为了让
+`pnpm package:win` / `pnpm package:mac` 产出的安装包能点「检查更新」，打包入口
+`scripts/bundle-desktop-env.mjs` 通过 `scripts/packaging-build-env.mjs` 注入：
+
+- `ZCODE_ENV=production`：固定正式身份，避免 fail-safe 落到 Preview；
+- `ZCODE_AUTO_UPDATE=1`：默认启用自动更新。
+
+优先级不变：显式设置的 `ZCODE_AUTO_UPDATE`（含空字符串表示关闭）优先于该默认值。不经过
+打包入口的构建（直接 `pnpm bundle:desktop`、`pnpm dev:desktop`）仍按「未配置即关闭」处理。
+
+自动更新能否真正生效还取决于 Release 资源命名：客户端按
+`<latest|preview>-<平台>-<架构>.yml` 取更新清单，由 `pnpm publish:github` 生成并上传。
+只上传 electron-builder 默认的 `latest.yml` / `latest-mac.yml` 会让客户端请求 404。
+
 ## 所有者与数据流
 
 ```
