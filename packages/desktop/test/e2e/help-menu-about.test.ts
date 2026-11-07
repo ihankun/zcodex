@@ -14,6 +14,7 @@ import {
 import {
   DEFAULT_WORKSPACE,
   clickTestIdByWebDriver,
+  getAuxiliaryWindowCenterOffset,
   waitForWorkspaceApp,
   seedSettings,
   readSettings,
@@ -138,6 +139,14 @@ async function assertAboutWindow() {
         }),
       { timeout: 10_000, timeoutMsg: "关于窗口未显示应用名称和版本" },
     );
+    // 关于窗口跟随应用主窗口居中，而不是固定在屏幕中心（docs/desktop/auxiliary-window-placement.md）。
+    const offset = await getAuxiliaryWindowCenterOffset("about");
+    expect(offset).not.toBeNull();
+    expect(offset!.horizontalDelta).toBeLessThanOrEqual(2);
+    // macOS 的 modal 子窗口以 sheet 形式贴附父窗口，纵向位置由系统管理。
+    if (process.platform !== "darwin") {
+      expect(offset!.verticalDelta).toBeLessThanOrEqual(2);
+    }
   } finally {
     await browser.electron.execute((electron) => {
       for (const window of electron.BrowserWindow.getAllWindows()) {

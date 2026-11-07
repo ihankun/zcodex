@@ -1,6 +1,7 @@
 import { decorateRequestSecurityLogArgs } from "./request-security-edition/index.js";
 /* eslint-disable max-lines -- 桌面平台 IPC 集中装配，拆散会让权限边界更难审计；行数随平台能力增长。 */
 import { BrowserWindow, dialog, ipcMain, nativeTheme } from "electron";
+import type { OpenDialogOptions, OpenDialogReturnValue, WebContents } from "electron";
 import { readZCodeStdioTapDevState } from "@zcode/services/node";
 import {
   DesktopCommandIds,
@@ -66,6 +67,21 @@ import { registerDesktopPrintToPdfIpcHandler } from "./desktopPrintToPdf.js";
 import { registerDesktopCommandIpcHandler } from "./desktopCommandIpc.js";
 import { registerCuaPipActiveSessionIpc } from "./desktopCuaPipIpc.js";
 
+/**
+ * 原生文件 / 目录选择器绑定发起调用的窗口作为 owner。
+ * 不传 owner 时系统把对话框放在屏幕居中；传 owner 后 Windows / Linux 会把它放在
+ * 调用窗口附近，macOS 则作为该窗口的 sheet，与辅助弹窗的定位规则一致。
+ */
+function showOpenDialogForSender(
+  sender: WebContents,
+  dialogOptions: OpenDialogOptions,
+): Promise<OpenDialogReturnValue> {
+  const parentWindow = BrowserWindow.fromWebContents(sender);
+  return parentWindow && !parentWindow.isDestroyed()
+    ? dialog.showOpenDialog(parentWindow, dialogOptions)
+    : dialog.showOpenDialog(dialogOptions);
+}
+
 export function registerPlatformIpcHandlers(options: {
   fetchHelpConfig?: () => Promise<unknown>;
   logger: {
@@ -119,8 +135,8 @@ export function registerPlatformIpcHandlers(options: {
   /** Browser tab 关闭、挂起、恢复与跨重启 shell IPC。 */
   browserViewResidencyHandlers?: BrowserViewResidencyIpcHandlers;
 }) {
-  ipcMain.handle(PlatformChannels.SelectDirectory, async () => {
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle(PlatformChannels.SelectDirectory, async (event) => {
+    const result = await showOpenDialogForSender(event.sender, {
       properties: ["openDirectory", "createDirectory"],
     });
     if (result.canceled || result.filePaths.length === 0) {
@@ -129,15 +145,15 @@ export function registerPlatformIpcHandlers(options: {
     return result.filePaths[0];
   });
 
-  ipcMain.handle(PlatformChannels.SelectDirectories, async () => {
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle(PlatformChannels.SelectDirectories, async (event) => {
+    const result = await showOpenDialogForSender(event.sender, {
       properties: ["openDirectory", "createDirectory", "multiSelections"],
     });
     return result.canceled ? [] : result.filePaths;
   });
 
-  ipcMain.handle(PlatformChannels.SelectFile, async () => {
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle(PlatformChannels.SelectFile, async (event) => {
+    const result = await showOpenDialogForSender(event.sender, {
       properties: ["openFile"],
     });
     if (result.canceled || result.filePaths.length === 0) {
@@ -146,8 +162,8 @@ export function registerPlatformIpcHandlers(options: {
     return result.filePaths[0];
   });
 
-  ipcMain.handle(PlatformChannels.SelectFiles, async () => {
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle(PlatformChannels.SelectFiles, async (event) => {
+    const result = await showOpenDialogForSender(event.sender, {
       properties: ["openFile", "multiSelections"],
     });
     if (result.canceled || result.filePaths.length === 0) {

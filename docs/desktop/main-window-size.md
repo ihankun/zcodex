@@ -10,6 +10,7 @@
 - 用户可拖拽调整窗口宽度，高度不得低于 `640px`，避免 1280x720 桌面环境因可用高度低于 768px 而无法调整窗口大小，同时保留主工作区、顶部栏和底部输入区域的基本可用空间。
 - 最小宽度保持 `480px`，用于兼容较窄桌面窗口；移动 Web 端不复用 Electron `BrowserWindow` 约束。
 - 窗口尺寸与位置状态是 app-global 的桌面设置，不按 workspace、remote session 或窗口 ID 隔离；Web、手机 `/remote`、辅助窗口和任务恢复状态不读取或写入该字段。
+- 辅助窗口的初始定位不属于本文范围，见 [Desktop 辅助窗口定位](auxiliary-window-placement.md)。
 
 ## Implementation
 

@@ -4,7 +4,7 @@
 
 ## 功能概述
 
-桌面端提供两处 **资源管理器** 入口，都打开同一个独立单例窗口：macOS 原生菜单栏的 Help 菜单，以及所有桌面平台右上角的问号帮助菜单（`WorkspaceHelpMenuButton`，2026-09-11 补入——Windows/Linux 没有原生菜单栏，Windows 自绘标题栏箭头菜单又已下线，此前 Windows 上没有任何入口）。Web 端不渲染该菜单项（`isDesktop` 由挂载处注入，见 `docs/windows-caption-help-menu.md`）。窗口顶部有四个 tab：**CPU**、**内存**、**存储**、**网络**（2026-09-10 裁决：存储管理从设置页整体迁入这里）。
+桌面端提供两处 **资源管理器** 入口，都打开同一个独立单例窗口：macOS 原生菜单栏的 Help 菜单，以及所有桌面平台右上角的问号帮助菜单（`WorkspaceHelpMenuButton`，2026-09-11 补入——Windows/Linux 没有原生菜单栏，Windows 自绘标题栏箭头菜单又已下线，此前 Windows 上没有任何入口）。Web 端不渲染该菜单项（`isDesktop` 由挂载处注入，见 `docs/windows-caption-help-menu.md`）。窗口首次打开时居中于应用主窗口，定位规则见 [Desktop 辅助窗口定位](../desktop/auxiliary-window-placement.md)。窗口顶部有四个 tab：**CPU**、**内存**、**存储**、**网络**（2026-09-10 裁决：存储管理从设置页整体迁入这里）。
 
 - **CPU / 内存 tab**：实时展示 ZCode 的 CPU 或内存占用，布局相同，只是指标卡与列表指标列换成当前 tab 的指标。切到「存储」或「网络」tab 时停止 CPU/内存的 1s 轮询。
 - **存储 tab**：本机 `.zcode` 数据目录的磁盘占用，按卷汇总、按类别拆分、可下钻与清理。产品与实现细节见 `docs/settings-storage-management.md`；下面「存储 tab 数据通路」只写与本窗口相关的接线。

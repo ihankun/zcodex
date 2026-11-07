@@ -28,6 +28,7 @@ import {
   DEFAULT_WORKSPACE,
   clearAppData,
   clickTestIdByDom,
+  getAuxiliaryWindowCenterOffset,
   getE2EAppDataPaths,
   waitForTestIdByDom,
   waitForWorkspaceApp,
@@ -124,6 +125,13 @@ describe("资源管理器 存储 tab E2E", () => {
   it("SM-01: 切到存储 tab 后自动扫描，磁盘卡片、根目录与类别大小随扫描完成填充", async function () {
     this.timeout(120_000);
     await openStorageTab();
+    // 资源管理器首次打开时居中于应用主窗口，而不是固定在屏幕中心。
+    const placement = await getAuxiliaryWindowCenterOffset("resource-manager");
+    expect(placement).not.toBeNull();
+    expect(placement!.horizontalDelta).toBeLessThanOrEqual(2);
+    if (process.platform !== "darwin") {
+      expect(placement!.verticalDelta).toBeLessThanOrEqual(2);
+    }
     await waitForScanComplete();
 
     expect(await $(sel(testId(TID_RESOURCE_MANAGER_STORAGE_DISK_CARD, "0"))).isDisplayed()).toBe(

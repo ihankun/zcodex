@@ -30,6 +30,7 @@ import { syncWindowControlsOverlayForZoomLevel } from "./desktopWindowButtonPosi
 import {
   DEFAULT_DESKTOP_WINDOW_HEIGHT,
   DEFAULT_DESKTOP_WINDOW_WIDTH,
+  resolveAuxiliaryWindowPosition,
 } from "./desktopWindowSize.js";
 import {
   clampDesktopZoomLevel,
@@ -356,9 +357,15 @@ function showZCodeEndpointPromptWindow(options: {
 }): Promise<string | undefined> {
   return new Promise((resolve) => {
     let settled = false;
-    const promptWindow = new BrowserWindow({
+    const promptSize = {
       width: ZCODE_ENDPOINT_PROMPT_WIDTH,
       height: ZCODE_ENDPOINT_PROMPT_HEIGHT,
+    };
+    const promptPosition = resolveAuxiliaryWindowPosition(promptSize, options.parentWindow);
+    const promptWindow = new BrowserWindow({
+      ...promptPosition,
+      width: promptSize.width,
+      height: promptSize.height,
       parent: options.parentWindow,
       modal: Boolean(options.parentWindow),
       resizable: false,

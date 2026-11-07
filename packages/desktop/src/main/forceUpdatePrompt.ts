@@ -4,6 +4,11 @@ import { resolve } from "node:path";
 import { type Locale } from "@zcode/shared";
 import type { ForceUpdateDialogText, ForceUpdateGuardLogger } from "./forceUpdateGuard.js";
 import type { ForceAutoUpdateState } from "./autoUpdater.js";
+import {
+  centerAuxiliaryWindowOverApplicationWindow,
+  resolveAuxiliaryWindowPosition,
+  resolveDesktopDialogAnchor,
+} from "./desktopWindowSize.js";
 
 const FORCE_UPDATE_PROMPT_WIDTH = 480;
 const FORCE_UPDATE_PROMPT_HEIGHT = 256;
@@ -489,17 +494,24 @@ export async function showForceUpdatePrompt(
   options: ShowForceUpdatePromptOptions = {},
 ): Promise<ForceUpdatePromptAction> {
   const { BrowserWindow, nativeTheme } = await import("electron");
-  const parentWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined;
+  // 启动门禁通常在创建主窗口之前执行，此时没有锚点，保持屏幕居中。
+  const parentWindow = resolveDesktopDialogAnchor();
+  const promptSize = {
+    width: FORCE_UPDATE_PROMPT_WIDTH,
+    height: FORCE_UPDATE_PROMPT_HEIGHT,
+  };
+  const promptPosition = resolveAuxiliaryWindowPosition(promptSize, parentWindow);
   return new Promise<ForceUpdatePromptAction>((resolvePrompt) => {
     let resolved = false;
     let shown = false;
     let autoUpdateDispose: (() => void) | undefined;
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
     const win = new BrowserWindow({
-      width: FORCE_UPDATE_PROMPT_WIDTH,
-      height: FORCE_UPDATE_PROMPT_HEIGHT,
-      minWidth: FORCE_UPDATE_PROMPT_WIDTH,
-      minHeight: FORCE_UPDATE_PROMPT_HEIGHT,
+      ...promptPosition,
+      width: promptSize.width,
+      height: promptSize.height,
+      minWidth: promptSize.width,
+      minHeight: promptSize.height,
       parent: parentWindow,
       modal: Boolean(parentWindow),
       frame: false,
@@ -512,7 +524,8 @@ export async function showForceUpdatePrompt(
       fullscreenable: false,
       show: false,
       alwaysOnTop: !parentWindow,
-      center: true,
+      // 没有主窗口锚定时保留原先的屏幕居中行为。
+      center: promptPosition === undefined,
       focusable: true,
       skipTaskbar: false,
       paintWhenInitiallyHidden: true,
@@ -541,7 +554,10 @@ export async function showForceUpdatePrompt(
       }
       // 下载态隐藏版本说明后需要收回窗口高度，避免出现大片空白；确认关闭/错误态再恢复默认高度。
       win.setSize(FORCE_UPDATE_PROMPT_WIDTH, height);
-      win.center();
+      // 高度变化后重新按主窗口居中；没有锚点时保留原来的屏幕居中。
+      if (!centerAuxiliaryWindowOverApplicationWindow(win, parentWindow)) {
+        win.center();
+      }
     };
 
     const resolveOnce = (action: ForceUpdatePromptAction, closeWindow: boolean) => {

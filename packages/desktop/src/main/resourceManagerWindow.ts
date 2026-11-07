@@ -15,6 +15,7 @@ import {
   type ZCodeProvider,
 } from "@zcode/shared";
 import { logger } from "./logger.js";
+import { resolveAuxiliaryWindowPosition } from "./desktopWindowSize.js";
 import { configureNetworkCaptureHost, observeNetworkWindow } from "./resourceManagerNetwork.js";
 import { normalizeElectronCpuToMachinePercent } from "./electronCpuNormalization.js";
 import type { ChromiumProcessRolePids } from "./processResourceRoleClassifier.js";
@@ -34,6 +35,7 @@ import {
 
 const preloadPath = join(import.meta.dirname, "../preload/resourceManager.cjs");
 const RESOURCE_MANAGER_WINDOW_TITLE = "Resource Manager";
+const RESOURCE_MANAGER_WINDOW_SIZE = { width: 900, height: 600 } as const;
 const BROWSER_USE_PLUGIN_NAME = "browser-use";
 
 /** 系统整机 CPU：两次 os.cpus() 之间 busy / total 的差分 */
@@ -260,9 +262,12 @@ export function openResourceManager(): void {
     return;
   }
 
+  // 单例窗口在已打开时只聚焦；首次创建时居中于应用主窗口，而不是屏幕正中。
+  const position = resolveAuxiliaryWindowPosition(RESOURCE_MANAGER_WINDOW_SIZE);
   instance = new BrowserWindow({
-    width: 900,
-    height: 600,
+    ...position,
+    width: RESOURCE_MANAGER_WINDOW_SIZE.width,
+    height: RESOURCE_MANAGER_WINDOW_SIZE.height,
     minWidth: 640,
     minHeight: 420,
     title: RESOURCE_MANAGER_WINDOW_TITLE,

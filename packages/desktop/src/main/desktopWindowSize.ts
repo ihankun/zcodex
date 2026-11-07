@@ -1,4 +1,5 @@
-import type { BrowserWindow, Rectangle } from "electron";
+import { BrowserWindow, screen } from "electron";
+import type { Rectangle } from "electron";
 import type { AppSettings } from "@zcode/shared";
 
 export const DEFAULT_DESKTOP_WINDOW_WIDTH = 1200;
@@ -174,4 +175,158 @@ export function attachDesktopWindowSizePersistence(
   // 随后的 app.exit 可能在 releaseLock 完成前终止 Main，遗留 setting.json.lock。
   // close 只取消尚未触发的防抖，不再启动新的设置写入。
   win.on("close", clearPersistTimer);
+}
+
+// ---------------------------------------------------------------------------
+// 辅助窗口定位
+// ---------------------------------------------------------------------------
+//
+// 历史行为：关于、资源管理器、更新提示等辅助窗口不传 x / y 时由 Electron 按
+// 显示器居中，`win.center()` 也按窗口当前所在显示器居中。用户把主窗口拖到屏幕
+// 角落后，弹窗仍出现在屏幕正中，和触发它的应用窗口脱节。这里统一改为以应用主
+// 窗口为锚点居中，并收敛到锚点所在显示器的工作区。
+// 规格见 docs/desktop/auxiliary-window-placement.md。
+
+interface AuxiliaryWindowSize {
+  width: number;
+  height: number;
+}
+
+interface AuxiliaryWindowPosition {
+  x: number;
+  y: number;
+}
+
+/** 只有 createBrowserWindow 创建、承载 workspace 的窗口才是弹窗锚点。 */
+const applicationWindows = new Set<BrowserWindow>();
+/** 无焦点窗口时（原生菜单、托盘、更新事件）回退到最近一次聚焦的主窗口。 */
+let lastFocusedApplicationWindow: BrowserWindow | null = null;
+
+function isUsableApplicationWindow(
+  candidate: BrowserWindow | null | undefined,
+): candidate is BrowserWindow {
+  return Boolean(candidate && !candidate.isDestroyed());
+}
+
+/**
+ * 登记应用主窗口。由 desktopWindowLifecycle 在 createBrowserWindow 之后调用；
+ * 注册表自身处理窗口关闭，调用方不需要额外注销。
+ */
+export function registerDesktopApplicationWindow(win: BrowserWindow): void {
+  applicationWindows.add(win);
+  lastFocusedApplicationWindow ??= win;
+  win.on("focus", () => {
+    lastFocusedApplicationWindow = win;
+  });
+  win.once("closed", () => {
+    applicationWindows.delete(win);
+    if (lastFocusedApplicationWindow === win) {
+      lastFocusedApplicationWindow = null;
+    }
+  });
+}
+
+/**
+ * 解析弹窗锚点。显式传入的调用窗口优先；否则依次回退到聚焦主窗口、
+ * 最近聚焦主窗口、任一存活主窗口。返回 undefined 时调用方保留系统默认放置。
+ */
+export function resolveDesktopDialogAnchor(
+  preferredWindow?: BrowserWindow | null,
+): BrowserWindow | undefined {
+  if (isUsableApplicationWindow(preferredWindow)) {
+    return preferredWindow;
+  }
+
+  const focusedWindow = BrowserWindow.getFocusedWindow();
+  if (isUsableApplicationWindow(focusedWindow)) {
+    if (applicationWindows.has(focusedWindow)) {
+      return focusedWindow;
+    }
+    // 聚焦窗口可能是辅助窗口；优先回到它所属的主窗口，而不是以辅助窗口为锚点。
+    const ownerWindow = focusedWindow.getParentWindow();
+    if (isUsableApplicationWindow(ownerWindow)) {
+      return ownerWindow;
+    }
+  }
+
+  if (isUsableApplicationWindow(lastFocusedApplicationWindow)) {
+    return lastFocusedApplicationWindow;
+  }
+
+  for (const candidate of applicationWindows) {
+    if (isUsableApplicationWindow(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+/** 把窗口居中到锚点，并按锚点所在显示器的工作区收敛。 */
+function resolveCenteredWindowPosition(
+  windowSize: AuxiliaryWindowSize,
+  anchorBounds: Rectangle,
+  workArea: Rectangle,
+): AuxiliaryWindowPosition {
+  const centeredX = Math.round(anchorBounds.x + (anchorBounds.width - windowSize.width) / 2);
+  const centeredY = Math.round(anchorBounds.y + (anchorBounds.height - windowSize.height) / 2);
+  return {
+    x: clampWithinWorkArea(centeredX, workArea.x, workArea.width, windowSize.width),
+    y: clampWithinWorkArea(centeredY, workArea.y, workArea.height, windowSize.height),
+  };
+}
+
+function clampWithinWorkArea(
+  offset: number,
+  workAreaOffset: number,
+  workAreaSize: number,
+  windowSize: number,
+): number {
+  // 辅助窗口比工作区还大时没有可用的居中区间，从工作区左上角开始放置。
+  const maximumOffset = workAreaOffset + workAreaSize - windowSize;
+  return Math.min(Math.max(offset, workAreaOffset), Math.max(workAreaOffset, maximumOffset));
+}
+
+/**
+ * 计算辅助窗口的初始位置，供 `new BrowserWindow({ ...position })` 使用。
+ * 没有可用锚点时返回 undefined，保持 Electron 默认的显示器居中。
+ */
+export function resolveAuxiliaryWindowPosition(
+  windowSize: AuxiliaryWindowSize,
+  preferredWindow?: BrowserWindow | null,
+): AuxiliaryWindowPosition | undefined {
+  const anchor = resolveDesktopDialogAnchor(preferredWindow);
+  if (!anchor) {
+    return undefined;
+  }
+  const anchorBounds = anchor.getBounds();
+  const workArea = screen.getDisplayMatching(anchorBounds).workArea;
+  return resolveCenteredWindowPosition(windowSize, anchorBounds, workArea);
+}
+
+/**
+ * 已创建窗口（更新状态窗在 show 前、强制升级提示在改高度后）重新居中。
+ * 返回 false 表示没有锚点或平台由系统管理位置，调用方可回退到 `win.center()`。
+ */
+export function centerAuxiliaryWindowOverApplicationWindow(
+  win: BrowserWindow,
+  preferredWindow?: BrowserWindow | null,
+): boolean {
+  if (!isUsableApplicationWindow(win)) {
+    return false;
+  }
+  // macOS 的 modal 子窗口以 sheet 形式贴附在父窗口上，位置由系统管理。
+  if (process.platform === "darwin" && win.isModal() && win.getParentWindow()) {
+    return false;
+  }
+  const bounds = win.getBounds();
+  const position = resolveAuxiliaryWindowPosition(
+    { width: bounds.width, height: bounds.height },
+    preferredWindow,
+  );
+  if (!position) {
+    return false;
+  }
+  win.setPosition(position.x, position.y);
+  return true;
 }

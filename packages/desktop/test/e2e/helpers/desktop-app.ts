@@ -1140,6 +1140,39 @@ export async function getAllWindowInfo(): Promise<WindowInfo[]> {
   });
 }
 
+/**
+ * 辅助窗口中心相对主应用窗口中心的偏移（DIP）。
+ * 规格：docs/desktop/auxiliary-window-placement.md。
+ */
+export async function getAuxiliaryWindowCenterOffset(
+  target: "about" | "resource-manager",
+): Promise<{ horizontalDelta: number; verticalDelta: number } | null> {
+  return browser.electron.execute((electron, kind) => {
+    const matchesTarget = (url: string): boolean =>
+      kind === "about"
+        ? url.startsWith("data:text/html") && decodeURIComponent(url).includes('id="about-title"')
+        : url.includes("resource-manager.html");
+    const windows = electron.BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed());
+    const mainWindow = windows.find((win) =>
+      win.webContents.getURL().includes("/renderer/index.html"),
+    );
+    const targetWindow = windows.find((win) => matchesTarget(win.webContents.getURL()));
+    if (!mainWindow || !targetWindow) {
+      return null;
+    }
+    const mainBounds = mainWindow.getBounds();
+    const targetBounds = targetWindow.getBounds();
+    return {
+      horizontalDelta: Math.abs(
+        mainBounds.x + mainBounds.width / 2 - (targetBounds.x + targetBounds.width / 2),
+      ),
+      verticalDelta: Math.abs(
+        mainBounds.y + mainBounds.height / 2 - (targetBounds.y + targetBounds.height / 2),
+      ),
+    };
+  }, target);
+}
+
 export async function setCurrentElectronRendererContentSize(
   width: number,
   height?: number,

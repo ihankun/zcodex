@@ -15,6 +15,7 @@ import {
   ZCODE_VERSION,
 } from "@zcode/shared";
 import { createCustomAboutDialogHtml } from "./aboutWindow.js";
+import { resolveAuxiliaryWindowPosition } from "./desktopWindowSize.js";
 
 interface DesktopBuildMetadata {
   appVersion?: string;
@@ -249,7 +250,13 @@ export async function showAboutDialog(
   // 问题原因：各平台原生消息框的排版、图标和按钮样式差异很大，无法复用 macOS 参考样式。
   // 这里统一使用自绘 modal，保证 About 的品牌展示和多语言文案在三端一致。
   const iconPath = resolveAboutIconPath(app.isPackaged);
+  // 关于窗口跟随应用主窗口居中，避免主窗口在屏幕角落时弹窗仍出现在屏幕正中。
+  const aboutWindowPosition = resolveAuxiliaryWindowPosition(
+    { width: ABOUT_WINDOW_WIDTH, height: ABOUT_WINDOW_HEIGHT },
+    parentWindow,
+  );
   const aboutWindow = new BrowserWindow({
+    ...aboutWindowPosition,
     width: ABOUT_WINDOW_WIDTH,
     height: ABOUT_WINDOW_HEIGHT,
     parent: parentWindow && !parentWindow.isDestroyed() ? parentWindow : undefined,

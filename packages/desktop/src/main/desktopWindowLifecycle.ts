@@ -24,7 +24,11 @@ import {
   renderTaskbarStatusDotPixels,
   syncUnreadBadgeForPlatform,
 } from "./unreadBadge.js";
-import { attachDesktopWindowSizePersistence, type DesktopWindowSize } from "./desktopWindowSize.js";
+import {
+  attachDesktopWindowSizePersistence,
+  registerDesktopApplicationWindow,
+  type DesktopWindowSize,
+} from "./desktopWindowSize.js";
 import {
   registerMainApplicationWindow,
   unregisterMainApplicationWindow,
@@ -106,6 +110,9 @@ export function createWindow(options: {
     resolveBrowserViewOwner: options.resolveBrowserViewOwner,
   });
   const label = `local-${win.webContents.id}`;
+
+  // 辅助弹窗以主应用窗口为定位锚点，注册表随窗口 closed 自动清理。
+  registerDesktopApplicationWindow(win);
 
   if (options.persistWindowSize) {
     attachDesktopWindowSizePersistence(win, options.persistWindowSize, (error) => {

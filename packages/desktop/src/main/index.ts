@@ -159,7 +159,11 @@ import {
   updateZCodeStdioTapDevMenuState,
 } from "./desktopApplicationMenu.js";
 import { resolveWindowsAppUserModelIdForFlavor } from "../../scripts/desktop-product-identity.mjs";
-import type { DesktopWindowSize } from "./desktopWindowSize.js";
+import {
+  centerAuxiliaryWindowOverApplicationWindow,
+  resolveDesktopDialogAnchor,
+  type DesktopWindowSize,
+} from "./desktopWindowSize.js";
 import { maybeWarnArchitectureMismatch } from "./desktopArchitectureGuard.js";
 // 本地定制：保留 applyAppIcon（Dock 图标只在未打包态覆盖，见笔记 2.4.2）；
 // 上游 v3.15.1 把 createWindowsDesktopTray 改名为 createDesktopTray 并新增 tray 能力探测，采用上游；
@@ -1844,10 +1848,8 @@ function openUpdateStatusWindow() {
     return;
   }
 
-  const parentWindow =
-    getMainApplicationWindows().find((candidate) => candidate.isFocused()) ??
-    getMainApplicationWindows()[0] ??
-    undefined;
+  // 更新状态窗只锚定主应用窗口；辅助窗口（关于、资源管理器）不能作为父窗口。
+  const parentWindow = resolveDesktopDialogAnchor();
   const win = new BrowserWindow({
     width: UPDATE_STATUS_WINDOW_WIDTH,
     height: resolveUpdateStatusWindowHeight(getAutoUpdaterState()),
@@ -1916,7 +1918,10 @@ function openUpdateStatusWindow() {
       return;
     }
     if (!win.isVisible()) {
-      win.center();
+      // 更新状态窗跟随主应用窗口居中；没有主窗口时保留原来的屏幕居中行为。
+      if (!centerAuxiliaryWindowOverApplicationWindow(win, parentWindow)) {
+        win.center();
+      }
       syncUpdateStatusWindowChrome(win);
       win.show();
       syncUpdateStatusWindowChrome(win);
