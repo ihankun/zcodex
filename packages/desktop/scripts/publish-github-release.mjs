@@ -3,7 +3,7 @@
  *
  * 客户端按 `https://github.com/<owner>/<repo>/releases/latest/download/<通道>-<平台>-<架构>.yml`
  * 取更新清单，所以这里要做三件事：
- *   1. 把打包生成的清单（`latest-mac.yml` / `latest.yml` / `latest-linux.yml`）按客户端规则改名；
+ *   1. 读取打包产物里的更新清单（打包阶段已改名为 `<通道>-<平台>-<架构>.yml`，兼容旧的 latest*.yml）；
  *   2. 校验清单里的版本、文件大小与 sha512 与实际产物一致——清单错了，用户端更新会直接失败；
  *   3. 把更新说明注入清单（electron-builder 不写这个字段），并给出上传命令。
  *
@@ -35,8 +35,8 @@ import {
   GITHUB_RELEASE_UPDATE_REPO,
   buildGitHubReleaseTag,
   buildGitHubReleaseUpdateFeedUrl,
-  resolveGitHubReleaseChannelFileStem,
-  resolveGitHubReleasePlatformTag,
+  resolveGitHubReleaseManifestFileName,
+  resolveUpdateManifestFileCandidates,
 } from "./github-release-channel.mjs";
 import { getTargetPlatform } from "./target-platform.mjs";
 
@@ -136,13 +136,6 @@ function normalizeArch(rawArch) {
   }
 }
 
-/** electron-builder 写出的清单名：win 无平台后缀，linux 只在非 x64 时带架构后缀。 */
-function resolveBuilderChannelFileName(platform, channelWord, arch) {
-  const osSuffix = platform === "win32" ? "" : `-${resolveGitHubReleasePlatformTag(platform)}`;
-  const archSuffix = platform === "linux" && arch !== "x64" ? `-${arch}` : "";
-  return `${channelWord}${osSuffix}${archSuffix}.yml`;
-}
-
 function sha512Of(filePath) {
   return new Promise((resolveHash, rejectHash) => {
     const hash = createHash("sha512");
@@ -229,7 +222,6 @@ async function main() {
   const targetPlatform = getTargetPlatform();
   const platform = options.platform ? normalizePlatform(options.platform) : targetPlatform.os;
   const arch = options.arch ? normalizeArch(options.arch) : targetPlatform.arch;
-  const channelWord = options.channel === "preview" ? "preview" : "latest";
 
   const version = JSON.parse(readFileSync(resolve(workspaceRoot, "package.json"), "utf-8")).version;
   const tag = options.tag ?? buildGitHubReleaseTag(version);
@@ -237,20 +229,26 @@ async function main() {
   const distDir = resolve(options.distDir);
   const outDir = resolve(options.outDir ?? resolve(distDir, "github-release"));
 
-  const builderChannelFile =
-    options.channelFile ?? resolveBuilderChannelFileName(platform, channelWord, arch);
-  const sourceYmlPath = resolve(distDir, builderChannelFile);
-  if (!existsSync(sourceYmlPath)) {
+  // 打包阶段已把清单改成标准名；preview 发布读取 build 写出的 latest-<平台>-<架构>.yml，
+  // 最后再兼容改动前产出的 electron-builder 旧名。
+  const candidateChannelFiles = options.channelFile
+    ? [options.channelFile]
+    : resolveUpdateManifestFileCandidates({ channel: options.channel, platform, arch });
+  const builderChannelFile = candidateChannelFiles.find((entry) =>
+    existsSync(resolve(distDir, entry)),
+  );
+  if (!builderChannelFile) {
     const candidates = existsSync(distDir)
       ? readdirSync(distDir).filter((entry) => entry.endsWith(".yml"))
       : [];
     fail(
-      `未找到清单 ${builderChannelFile}（目录 ${distDir}）` +
+      `未找到更新清单（候选：${candidateChannelFiles.join(", ")}；目录 ${distDir}）` +
         (candidates.length > 0
           ? `；现有清单：${candidates.join(", ")}，可用 --channel-file 指定`
           : ""),
     );
   }
+  const sourceYmlPath = resolve(distDir, builderChannelFile);
 
   const yml = parseYaml(readFileSync(sourceYmlPath, "utf-8"));
   if (yml.version !== version) {
@@ -283,7 +281,7 @@ async function main() {
 
   const outputYmlPath = resolve(
     outDir,
-    `${resolveGitHubReleaseChannelFileStem({ channel: options.channel, platform, arch })}.yml`,
+    resolveGitHubReleaseManifestFileName({ channel: options.channel, platform, arch }),
   );
   mkdirSync(outDir, { recursive: true });
   writeFileSync(outputYmlPath, stringifyYaml(outputYml), "utf-8");
@@ -316,7 +314,7 @@ async function main() {
 
   info(`版本 ${version}，通道 ${options.channel}，目标 ${platform}-${arch}`);
   info(`客户端将请求：${feedUrl}/${basename(outputYmlPath)}`);
-  info(`改名后的清单：${outputYmlPath}`);
+  info(`发布清单：${outputYmlPath}`);
   info(defaultNotes ? "已注入更新说明" : "未提供 --notes-file，应用内更新说明为空");
   info(`待上传文件（${uploadFiles.length} 个）：`);
   for (const file of uploadFiles) {

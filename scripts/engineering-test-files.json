@@ -141,6 +141,7 @@
   "packages/desktop/test/taskTitleMarqueeFixture.test.ts",
   "packages/desktop/test/telemetryFieldContract.test.ts",
   "packages/desktop/test/tsupChunkIsolation.test.ts",
+  "packages/desktop/test/updateManifestNames.test.ts",
   "packages/desktop/test/upstreamProviderPreferenceSeed.test.ts",
   "packages/desktop/test/upstreamRecordedModels.test.ts",
   "packages/desktop/test/upstreamReplayFixtureResolution.test.ts",

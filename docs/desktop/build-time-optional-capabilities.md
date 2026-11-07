@@ -33,7 +33,9 @@ Release（`packages/desktop/src/main/githubReleaseUpdateFeed.ts`）。为了让
 打包入口的构建（直接 `pnpm bundle:desktop`、`pnpm dev:desktop`）仍按「未配置即关闭」处理。
 
 自动更新能否真正生效还取决于 Release 资源命名：客户端按
-`<latest|preview>-<平台>-<架构>.yml` 取更新清单，由 `pnpm publish:github` 生成并上传。
+`<latest|preview>-<平台>-<架构>.yml` 取更新清单。打包入口会在 `bundle` 收尾把
+electron-builder 的 `latest*.yml` 改名为 `latest-<平台>-<架构>.yml`；发布时
+`pnpm publish:github` 再按通道生成并上传 `<latest|preview>-<平台>-<架构>.yml`。
 只上传 electron-builder 默认的 `latest.yml` / `latest-mac.yml` 会让客户端请求 404。
 
 ## 所有者与数据流

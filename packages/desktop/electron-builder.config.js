@@ -998,7 +998,8 @@ export default {
     // 只是按单 Range 顺序拉取差异块，避免 Windows 用户更新时从约 15MB 退化成 300MB+ 全量包。
     useMultipleRangeRequest: false,
     // 更新清单由 main 进程的 GitHubReleaseUpdateProvider 指定，这里的 generic url 仅用于让
-    // electron-builder 生成 latest-*.yml（发布脚本再按客户端命名规则改名），不会被请求。
+    // electron-builder 生成 latest*.yml；bundle 收尾会把它改名成客户端检索的
+    // `<通道>-<平台>-<架构>.yml`，这个 url 不会被请求。
     url: "http://localhost:8081",
   },
 };

@@ -197,6 +197,10 @@ latest-mac-arm64.yml   latest-mac-x64.yml   latest-win-x64.yml   latest-linux-x6
 latest-<平台>-<架构>.yml   对应   ZCodex-<版本>-<平台>-<架构>.zip / .exe / .AppImage
 ```
 
+`pnpm package:win` / `pnpm package:mac` 等打包入口在收尾阶段就会把 electron-builder 生成的
+`latest*.yml` 改名为标准格式（例如 `latest-win-x64.yml`），`packages/desktop/dist/` 里直接就是
+客户端请求的文件名，不需要再手工复制。
+
 把打包产物整理成可上传文件（会校验清单版本、文件大小与 sha512）：
 
 ```bash
@@ -204,14 +208,14 @@ pnpm publish:github --platform mac --arch arm64 \
   --notes-file release-notes.md [--notes-file-en release-notes-en.md] [--channel stable] [--upload]
 ```
 
-不传 `--upload` 时只输出待上传文件与 `gh release` 命令；改名后的清单写在
-`packages/desktop/dist/github-release/`。上传约定：
+不传 `--upload` 时只输出待上传文件与 `gh release` 命令；发布清单写在
+`packages/desktop/dist/github-release/`（`--channel preview` 时是 `preview-<平台>-<架构>.yml`）。上传约定：
 
 - Release tag 必须是 `v<版本>`，且版本号与根 `package.json` 一致；
 - 该 Release **不能**是 pre-release，否则 `releases/latest` 会指向别的 Release；
-- 待上传内容包括安装包、同名 `.blockmap`（差分更新用）和**改名后的清单**：
-  客户端只请求 `latest-<平台>-<架构>.yml`，electron-builder 生成的 `latest-mac.yml`
-  即使一起传上去也不会被读取，漏传改名后的清单就是必然 404；
+- 待上传内容包括安装包、同名 `.blockmap`（差分更新用）和**标准名清单**：
+  客户端只请求 `latest-<平台>-<架构>.yml`，electron-builder 的旧名 `latest-mac.yml` / `latest.yml`
+  即使一起传上去也不会被读取，漏传标准名清单就是必然 404；
 - `releases/latest` 按最新 tag 解析，所以「先打 tag、后传资源」的窗口期内客户端检查更新会 404；
 - macOS 自动更新要求新旧包使用同一 Developer ID 签名，未签名包只会得到下载失败；
 - 使用 `--channel preview` 时，该 Release 必须同时包含 stable 通道的清单与安装包，否则 stable 用户取不到文件。

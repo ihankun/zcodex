@@ -24,6 +24,7 @@ import {
 } from "../../../scripts/spawn-command.mjs";
 import { resolveIntranetDepsBaseUrl } from "../../../scripts/intranetDefaults.mjs";
 import { stampMacosUpdateManifests } from "./macos-update-manifest.mjs";
+import { normalizeUpdateManifestName } from "./update-manifest-names.mjs";
 
 const desktopRoot = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(desktopRoot, "../..");
@@ -775,6 +776,11 @@ async function main() {
 
   await runTimedAsync("bundle:electron-builder", () =>
     runElectronBuilderWithRetry(buildArgs, electronBuilderEnv),
+  );
+
+  // electron-builder 只能写出 `latest*.yml`，这里先改成客户端检索的标准名，再做各平台清单加工。
+  await runTimedAsync("bundle:normalize-update-manifest-name", () =>
+    normalizeUpdateManifestName({ outputDir: desktopDistRoot, platform: os, arch }),
   );
 
   await stampMacosUpdateManifests({ outputDir: desktopDistRoot, platform: os });
