@@ -981,6 +981,10 @@ export default {
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
+    // Windows「设置 → 应用 → 已安装的应用」的名称来自卸载项 DisplayName。
+    // electron-builder 默认拼成 `${productName} ${version}`，会和同一行的版本列重复；
+    // 这里只保留产品名，Preview 身份仍由 ${productName} 宏自动变成 "ZCodex Preview"。
+    uninstallDisplayName: "${productName}",
     // Windows 安装流程使用独立安装图标，和应用运行时图标解耦。
     installerIcon: "build/icon_installer.ico",
     uninstallerIcon: "build/icon_installer.ico",

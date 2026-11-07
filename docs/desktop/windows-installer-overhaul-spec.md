@@ -93,6 +93,7 @@ installer-completed (日志可查，完成页直接启动 `$INSTDIR\\ZCode.exe`)
 - 用户删除的 `.lnk` 不重建；完成页直接启动新安装目录的 exe。
 - `app.setAppUserModelId()` 在打包态使用生产/Preview 对应 `appId`，开发态使用 `cn.aminer.zcode`。
 - 产品描述的唯一来源是 `packages/desktop/package.json` 的 `description`：electron-builder 把它作为 NSIS `APP_DESCRIPTION` 写入新建快捷方式与卸载项 `Comments`，并作为 Linux 打包产物 `.desktop` 的 `Comment`，因此改产品名时必须同步这一字段。Linux AppImage 运行期写入的用户级 `zcode.desktop` 仍使用固定的归属标记行，不属于该字段。
+- 「设置 → 应用 → 已安装的应用」中的名称来自 NSIS 卸载项 `DisplayName`，固定为产品名（`ZCodex` / `ZCodex Preview`），不拼接版本号；版本由同一注册表项的 `DisplayVersion` 独立展示。实现为 `nsis.uninstallDisplayName: "${productName}"`，Preview 身份继续由产品名宏自动跟随。
 
 ## 接受用例
 
@@ -106,6 +107,7 @@ installer-completed (日志可查，完成页直接启动 `$INSTDIR\\ZCode.exe`)
 | WIN-INSTALL-SHORTCUT-001  | 正确/失效/被删除的快捷方式             | 正确项保留参数，失效项修复，删除项不重建                               |
 | WIN-INSTALL-SHORTCUT-002  | 目标正确但描述为旧产品名或空           | 原位刷新为当前 `APP_DESCRIPTION`，参数、图标和 AUMID 不变              |
 | WIN-INSTALL-AUMID-001     | 生产与 Preview 打包运行                | 主进程 AUMID 与 NSIS `appId` 相等，可被 Shell 正确索引/固定            |
+| WIN-INSTALL-DISPLAY-001   | 安装生产或 Preview 包                  | 「已安装的应用」名称为产品名，版本只在版本列展示，不拼在名称里         |
 
 ## 本轮实现边界
 
