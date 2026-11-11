@@ -85,7 +85,6 @@ export function UpdateStatusDialog({
     titleId: dialogTitleId,
   });
   const showSkipVersion = isBeforeDownload && Boolean(skippableVersion);
-  const showLaterButton = !isDownloading;
   // 未签名构建：能自动替换 bundle 时下载完成给「安装并重启」，否则只能打开安装包让用户自己拖。
   const canAutoInstall = manualInstaller?.canInstallAutomatically === true;
   const showManualInstallerHint = isManualInstall && isDownloaded;
@@ -253,18 +252,18 @@ export function UpdateStatusDialog({
               edgeToEdge ? "w-auto flex-row justify-end" : null,
             )}
           >
-            {showLaterButton ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="lg"
-                className="h-9 px-4"
-                disabled={isUpdateActionPending}
-                onClick={() => onOpenChange(false)}
-              >
-                {intl.formatMessage({ id: "updateDialog.later" })}
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="h-9 px-4"
+              disabled={isUpdateActionPending}
+              onClick={() => onOpenChange(false)}
+            >
+              {intl.formatMessage({
+                id: isDownloading ? "updateDialog.backgroundDownload" : "updateDialog.later",
+              })}
+            </Button>
             {isDownloaded && isManualInstall && canAutoInstall ? (
               <Button
                 type="button"

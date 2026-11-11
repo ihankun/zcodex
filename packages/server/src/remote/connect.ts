@@ -405,5 +405,5 @@ function buildRemoteServerCommand(
       );
     }
   }
-  return `${envParts.join(" ")} ~/.zcodex/server/node ~/.zcodex/server/zcode-server.cjs`;
+  return `${envParts.join(" ")} ~/.zcodex/server/node ~/.zcodex/server/zcode-server.cjs --prepare-credentials`;
 }

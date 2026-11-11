@@ -1,13 +1,13 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
-> 上游基线：**ZCode v3.17.1 = `a60ba6a7`**（`chore: sync ZCode source`；上一基线 v3.16.2 = `3c5b2276`，已并入 dev）。
-> fork 版本号独立演进，当前 `1.5.0`（上游 v3.17.1 合并这一轮）。
+> 上游基线：**ZCode v3.18.0 = `b95ebaff`**（`chore: sync ZCode source v3.18.0`；上一基线 v3.17.2 = `a9fe401e`，已并入 dev）。
+> fork 版本号独立演进，当前 `1.5.3`（上游 v3.18.0 合并这一轮未随合并升版本）。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
-> `git diff a60ba6a7 dev -- .` 即全部本地改动；
+> `git diff b95ebaff dev -- .` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-10-30（v3.17.1 合并，见第七节）。
+> 最近复核：2026-11-11（v3.18.0 合并，见第七节）。
 
 ## 一、概览
 
@@ -109,7 +109,14 @@
 - `packages/services/src/paths.ts` — `getZCodeDataRootDir()` 返回 `{dataBaseDir}/.zcodex`
 - `packages/services/src/storage/adapters/rootsResolver.ts` — `ZCODE_DATA_DIR_NAME = ".zcodex"`（常量名保留）
 
-**desktop**：`desktopDataBaseDirBootstrap.ts`、`desktopChromiumHardwareAccelerationBootstrap.ts`、`main/index.ts`（setting.json 引导读取）、`desktopRuntimeEnv.ts`（`ZCODE_HOME` fallback）、`exportLogs.ts`（归档前缀 `.zcodex/cli/...`）、`mcpUserDirectory/`（user 级 segments）、`host/remotePromptAttachments.ts`、`desktopCommandHandlers.ts`（清除数据确认文案）
+**desktop**：`desktopDataBaseDirBootstrap.ts`、`desktopChromiumHardwareAccelerationBootstrap.ts`、`main/index.ts`（setting.json 引导读取）、`desktopRuntimeEnv.ts`（`ZCODE_HOME` fallback）、`exportLogs.ts`（归档前缀 `.zcodex/cli/...`）、`mcpUserDirectory/`（user 级 segments）、`host/remotePromptAttachments.ts`、`desktopCommandHandlers.ts`（清除数据确认文案）、`desktopApplicationLocaleBootstrap.ts`（v3.18.0 新增：`~/.zcodex/v2/setting.json`）
+
+**v3.18.0 新增的上游数据路径（已按本规则改名，后续上游再动这些地方同样处理）**：
+
+- `packages/shared/src/managed-worktree/layout.ts` — `MANAGED_WORKTREE_HOME_SEGMENTS = [".zcodex", "worktrees"]`
+- `packages/services/src/extensions/**`、`packages/shared/src/extension-host/grants.ts` — 扩展授权/审计 `~/.zcodex/v2/extensions`
+- `packages/zcode-server-cli/src/cli.ts`、`runtime/releaseManager.ts` — `~/.zcodex/v2/credentials.json`
+- `packages/desktop/scripts/auto-update-ca-constraints-smoke.mjs`、`scripts/mcp-apps-host-fixture/session-ready-main.ts` — 脚本里的临时 home / agent-data 路径
 
 **远端部署**：`packages/server/src/remote/deployShared.ts`（`REMOTE_BASE = "~/.zcodex/server"`）、`connect.ts`、`zcodeAgentBundleWrapper.ts`、`packages/zcode-server-cli/src/runtime/paths.ts`
 
@@ -536,6 +543,16 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 | `packages/services/src/bots/messages.ts`、`bots/{feishu,telegram,weixin}ChannelRuntime.ts`、`bots/providers/weixinProvider.ts`                                  | Bot 在聊天里发出的文案（helpTitle、远端未连接提示、窗口占用提示）                                 |
 | `packages/desktop/build/installer.nsh`                                                                                                                          | 仅「安装目录含数据目录」弹窗文案（NSIS 函数名与 `ZCode-*.log` 日志文件名不动）                    |
 
+**v3.18.0 新增 ja-JP / ko-KR / ru-RU 三套语言包（2026-11-11）**：上游把界面语言扩到 5 种
+（`packages/ui/src/i18n/localeMessages.ts` + `shared/src/locale.ts` + `LocaleSwitcher.tsx`）。
+三份新 locale 各约 140 处 `ZCode`，合并时按本节的替换口径统一改为 `ZCodex`（`ZCode Agent` 也统一为
+`ZCodex Agent`，与 zh/en 已有的 `settings.commands.source.zcodeAgent` 一致），并把其中的
+`~/.zcode/server`、`.zcode/v2`、`~/.zcode/plugins` 等用户可见路径改为 `.zcodex`。**`.zcodeignore`
+保持原样**。上游以后再扩语言时同样处理：先做品牌/路径替换，再跑 `pnpm i18n:check`。
+注意 locale 的 **key** 里含 `ZCode` / `zcode`（`openInZCode`、`toggleZCodeStdioTap`、
+`settingsSync.agent.zcode`、`settings.zcodeInteractionBehavior` 等），**替换只能动值、不能动 key**
+（2026-11-11 踩坑，见第三节）。
+
 **刻意不改（要改先想清楚）：**
 
 - `ZCode Protocol`：协议名，属内部标识符。
@@ -914,6 +931,16 @@ Vitest（`scripts/engineering-test-files.json`，入口 `pnpm test:engineering` 
   `ZCodex`/`.zcodex` 的 key，把当前上游 value 重新做同样的品牌替换（保留上游新措辞），
   而不是整条取回旧 value。检查脚本已加 ②b：基线品牌值被覆盖会逐条列出（`--fail-on-lost` 可转失败）。
   注意 `readFlatEntries` 同时支持单引号值（英文 MCP 额度提示就是单引号，旧解析会漏）。
+- **批量替换品牌/路径只能动 value，不能动 key（2026-11-11 实测）。** 对 locale 文件跑
+  `s/ZCode/ZCodex/` 或 `s/\.zcode/\.zcodex/` 会把 key 也改掉：
+  `chat.message.link.openInZCode` → `openInZCodex`、`titleBar.menu.help.toggleZCodeStdioTap`、
+  `settingsSync.agent.zcode` → `agent.zcodex`。`pnpm i18n:check` ①会报「代码引用的 id 缺失」，
+  但只有逐条核对 key 集合才能发现「新增了一个 x 结尾的 key」。正确做法：只处理引号后的值
+  （或按行区分 `"key": "value"` 的两段），改完用下面命令对比 key 集合：
+  `git show <基线>:<file> | grep -oE '^  "[^"]+":' | sort` 与当前文件 `comm`。
+- **上游新增 locale 时必须同步做品牌/路径替换（2026-11-11）。** v3.18.0 新增
+  ja-JP / ko-KR / ru-RU，默认不替换会在这三种语言下显示 `ZCode` 与 `~/.zcode/server`。
+  三份文件都是 `{...enUS, ...<locale>}` 的覆盖层，`pnpm i18n:check` 不覆盖它们的值。
 
 ## 四、明确未改动（合并冲突时可直接采用上游）
 
@@ -997,12 +1024,15 @@ comm -12 \
 
 # ④ 必跑验证（与上游 pre-push 口径一致，2026-10-30）
 pnpm typecheck && pnpm lint && pnpm db:schema:check && pnpm test:architecture && pnpm architecture:check --changed
-# 基线（2026-10-30，依赖已装）：typecheck exit 0；lint 83 warnings / 0 errors；
-#   schema 8 passed；test:architecture 50 passed / 1 skipped；architecture 0 违规。
+# 基线（2026-11-11，v3.18.0 合并后，依赖已装）：typecheck exit 0；lint 540 warnings / 0 errors
+#   （上游 v3.18 大幅新增代码后 warning 数上升，0 error 才是门禁）；schema 8 passed；
+#   test:architecture 60 passed / 1 skipped；architecture 0 违规。
 #   没装依赖时 typecheck 报的 TS2307 是环境噪音，先 pnpm install。
-# 改动过 main / preload / renderer 时额外跑（既有缺口基线：main 0、renderer 154，别让它变多）
+# 改动过 main / preload / renderer 时额外跑（既有缺口基线：main 0、renderer 169，别让它变多）
 pnpm exec tsc -p packages/desktop/tsconfig.main.json --noEmit
 pnpm exec tsc -p packages/desktop/tsconfig.renderer.json --noEmit
+# renderer 的 169 个错误全是既有类别（window.zcode 全局声明缺失、@zcode/ui/styles.css 副作用导入、
+# rootDir 配置），v3.17.1 时是 154，增量来自上游新增的 window.zcode 调用点；不是解冲突引入。
 
 # ⑤ App 业务单测已退役（2.11）：不要在 packages/*/test 下新增或恢复业务 test/spec 或 contract.test.ts。
 #    工程测试按需跑 pnpm test:engineering <文件>（精确清单 scripts/engineering-test-files.json）；
@@ -1020,9 +1050,11 @@ pnpm test:engineering packages/desktop/scripts/gen-ui-runtime-assets.test.ts
 #      key——整取上游会覆盖 fork 改过的 value，必须逐条恢复品牌替换（见第三节）。
 pnpm i18n:check
 pnpm i18n:check -- --baseline <合并前的 dev tip>
-# 基线（2026-10-30 实测）：① 3054 个 id 全部可解析；② 相对合并前 ab519c43，
-#   zh/en 各剩 86 条且全部是上游 v3.17.1 删除的旧 key（onboarding.welcome.*、settings.*.remoteSync.* 等），
-#   代码中已无引用，不恢复。新增任何一条都要能解释来源，别默默接受。
+# 基线（2026-11-11 实测）：① 3201 个 id 全部可解析；② 相对合并前 bf72f49e，
+#   zh/en 各剩 41 条且全部是上游 v3.18.0 删除的旧 key（toolCall 分组/executeGroup、imageEditor.eraser、
+#   conversationShare.readonly.marker*、confirmDialog.taskArchive*、settings.toolGrouping* 等），
+#   代码中已无引用，不恢复；②b 无品牌值被覆盖。新增任何一条都要能解释来源，别默默接受。
+#   ja-JP / ko-KR / ru-RU 是 v3.18.0 新增覆盖层，不在 ①/② 的 zh/en key 空间内，需按 2.7 手工替换品牌。
 ```
 
 **CLI（`apps/zcode-cli`）侧的验证口径**：`pnpm --dir apps/zcode-cli typecheck` 走的是 turbo，
@@ -1290,6 +1322,64 @@ Electron 44.7.0 / electron-builder 26.17.0 / electron-updater 6.8.10；新增 `d
 ② 相对 ab519c43 只剩 86 条上游删除 key；`tsconfig.main.json` **0 errors**、
 `tsconfig.renderer.json` 154（与上轮一致）；第六节 ① grep 0 行。
 未执行桌面 E2E（本机无 Chromium，环境受限）；工程测试未跑全量，按 `test:engineering` 入口随时可补。
+
+### 2026-11-11 上游 v3.17.1 → v3.17.2（补记）
+
+上游提交：`a9fe401e chore: sync ZCode source v3.17.2`（202 文件，+9634/−1471）。
+
+**冲突 1 处**：`package.json` — 保留 fork `zcodex` / `1.5.1`，采纳上游代码与文档。
+合并提交 `d413b31b`；当时验证：`pnpm typecheck` 通过、`pnpm lint` 0 error（84 warnings）、
+`architecture:check` 0 违规。**本次补记，因为当时漏写第七节。**
+
+### 2026-11-11 上游 v3.17.2 → v3.18.0
+
+上游提交：`b95ebaff chore: sync ZCode source v3.18.0`（5099 文件，+429348/−44745；根 `package.json` 3.18.0）。
+这是功能大版本：插件扩展宿主（extension host，§17 授权/审计/视图）、design 内置插件与
+`packages/design-runtime`、`packages/session-control`、`packages/plugin-api`、系统凭据加密
+（`credential-security`）、受管 worktree、界面语言扩到 5 种（新增 ja-JP / ko-KR / ru-RU）、
+语音输入、分享管理页、浏览器设备预设等。
+
+**冲突 32 处（31 content + 1 modify/delete），处理方式：**
+
+| 类别          | 文件                                                                                                                                                                                                                                                                                  | 处理                                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本/配置     | `package.json`、`.gitattributes`                                                                                                                                                                                                                                                      | 保留 fork `zcodex` / 1.5.3；`.gitattributes` 取并集（fork 的 `dist-types` LF + 上游 design-plugin 的 LF/vendored 规则）                                                                            |
+| modify/delete | `packages/desktop/src/main/manifestUpdateProvider.ts`（本地删 / 上游改）                                                                                                                                                                                                              | 继续删除（2.5）                                                                                                                                                                                    |
+| 自动更新      | `packages/desktop/src/main/autoUpdater.ts`、`main/index.ts`                                                                                                                                                                                                                           | 保留 `applyGitHubReleaseUpdateFeed` 与手动安装 IPC；**不接受**上游 manifest provider 与 `deviceMid` / `resolveEndpointOrigin` / `resolveZcodeJwtToken` 注入；启动 force-gate 调用保持删除（2.4.1） |
+| 更新窗口      | `packages/ui/src/UpdateStatusDialog.tsx`                                                                                                                                                                                                                                              | 保留手动安装/更新说明分支；采纳上游「下载中也可后台下载」按钮（`updateDialog.backgroundDownload`）                                                                                                 |
+| 模型设置      | `packages/ui/src/settings/ModelProviderSection.tsx`                                                                                                                                                                                                                                   | 保留 fork 的「未连接隐藏 + 主动展开」（2.3.5）；连接判定改用上游 v3.18 的 family/availableFamilies 信号，二者合并                                                                                  |
+| 设置页        | `packages/ui/src/SettingsPage.tsx`                                                                                                                                                                                                                                                    | 合并：采纳上游 compact-web 布局，保留 Windows 顶部占位 `h-0`（2.3.2）                                                                                                                              |
+| 欢迎/侧栏     | `packages/ui/src/WelcomeScreen.tsx`、`WorkspaceSidebarFooter.tsx`、`WorkspaceHeaderSections.tsx`                                                                                                                                                                                      | 保留 `ZCodex` aria-label、无邀请/升级入口（2.3.8、2.3.9）、任务菜单无反馈入口（2.3.10）；采纳上游图标改名与移除 confirmDialog 的归档确认                                                           |
+| 应用外壳      | `packages/ui/src/App.tsx`                                                                                                                                                                                                                                                             | 采纳上游 `ExtensionViewsProvider` 包装与新 props；继续不传 `appLogoUrl`（2.3.3）                                                                                                                   |
+| 字面量        | `adapters/context`、android-emulator README、`desktopFinder/WindowsOpenFolder`、`desktopHostProcess`、`preload`、`renderer/main`、`wdio.conf`、`remote/connect`、`usageStatsService`、`zcodeTaskServiceAdapter`、`shared/channels`、`shared/platform`、web `main`/`authLocale`/分享页 | 取上游后重新施加 `.zcodex` / `ZCodex`；Finder/右键菜单采纳上游类型收窄，只保留中文「在ZCodex中打开」                                                                                               |
+| 分享页        | `packages/web/src/share/ConversationShareLandingPage.tsx`                                                                                                                                                                                                                             | 上游改成 `ShareBrandMark`（ZCODE 字标 SVG），fork 继续用 `ZCodex` 文本，不引入 upstream wordmark                                                                                                   |
+| i18n          | `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`                                                                                                                                                                                                                                       | 按 hunk 取上游新措辞后重施品牌；删除上游已删除或搬家的旧 key（41 条），移除 fork 在 v3.17.1 补回、上游 v3.18 重新提供的 `taskList.noArchivedTasks` / `workspaceSidebar.addProject` 重复项          |
+| 文档/测试     | `docs/desktop/windows-installer-overhaul-spec.md`、`help-menu-about.test.ts`                                                                                                                                                                                                          | 文档取并集（保留 SHORTCUT-002 / DISPLAY-001 + 上游 RECOVERY-\*）；E2E 采纳上游 `pinE2ELocale` 并保留 fork 辅助窗口居中用例                                                                         |
+
+**上游新增语言包（ja-JP / ko-KR / ru-RU）**：各约 140 处 `ZCode` 与 6 处 `.zcode` 用户路径，
+已按 2.7 统一改为 `ZCodex` / `.zcodex`；替换**只动值不动 key**（本次误伤 3 个 key，已还原，见第三节）。
+zh-CN / en-US 中上游新增的 15 处 `ZCode` 文案同样已改。
+
+**上游新增源码里的数据路径**：`desktopApplicationLocaleBootstrap`、managed-worktree、extension-host
+授权/审计、server-cli credentials、自动更新 smoke 与 MCP fixture 共 6 类路径按 2.2 改为 `.zcodex`；
+第六节 ① grep 复查只剩上游测试夹具（已一并修改）。`apps/zcode-cli/docs/**` 与官方插件源码保持上游原样。
+
+**上游带来的新依赖**：`pnpm install` 已执行（新增 workspace 包 `@zcode/session-control`、
+`@zcode/plugin-api`、`@zcode/design-runtime`，以及 `@radix-ui/react-menu@2.1.16` patch）。
+`typecheck` 清单新增 `packages/design-runtime`、`packages/desktop/tsconfig.renderer-services.json`、
+`packages/plugin-api`；`lint` 追加 `session-control-boundary.mjs`，`test:architecture` 追加
+`react-hooks-lint` 与 `session-control-boundary` 用例。
+
+**合并后自查（2026-11-11 实测）**：`pnpm typecheck` exit 0；`pnpm lint` 540 warnings / 0 errors；
+`pnpm db:schema:check` 8 passed；`pnpm test:architecture` 60 passed / 1 skipped；
+`pnpm architecture:check --changed` 0 违规；`pnpm i18n:check` ① 3201 个 id 全部可解析、
+② 相对 bf72f49e 仅 41 条上游删除 key、②b 无品牌值被覆盖；`tsconfig.renderer.json` 169（上游新增
+`window.zcode` 调用点，全部为既有缺口类别）；Gen UI 资源哈希用例通过；第六节 ①/② grep 干净。
+未执行桌面 E2E（本机无 Chromium，环境受限）；未跑全量工程测试。
+
+**基线注意**：v3.18.0 后 `packages/ui/src/i18n/locales` 有 5 个文件，任何「全仓 ZCode 替换」都要
+先排除注释与 key；`packages/desktop/scripts/mcp-apps-host-fixture` 等上游脚本里的路径已随本次改名，
+上游下次更新同文件时优先取上游再重施 `.zcodex`。
 
 ## 八、注意事项
 

@@ -36,3 +36,9 @@ apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/** -text
 # 打包重新生成又变回 LF：内容完全相同（git diff 为空），但 index 缓存的 size 变了，
 # git status 会把它们误报为已修改。固定 LF 后检出与生成同尺寸，打包不再产生假变更。
 apps/zcode-cli/packages/*/dist-types/** text eol=lf
+
+# design 内置插件：第三方设计资源保持上游原字节（许可登记按原文哈希校验）；
+# SessionStart hook 是 sh/cmd 双写法脚本，CRLF 会让 sh 解析失败，固定 LF。
+apps/zcode-cli/packages/design-plugin/skills/design/design-resources/** -text -whitespace linguist-vendored=true
+apps/zcode-cli/packages/design-plugin/hooks/design-rules text eol=lf
+apps/zcode-cli/packages/design-plugin/hooks/run-hook.cmd text eol=lf
