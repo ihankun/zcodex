@@ -9,30 +9,15 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { runCommand } from "./spawn-command.mjs";
 
-// Bugfix: Windows GNU tar（Git Bash）会把绝对路径里的盘符冒号（C:）当成远程主机名，
-// 反斜杠路径也会被 MSYS 参数转换破坏。tar 参数统一转正斜杠，归档路径优先改用
-// 相对 cwd 的形式避开盘符冒号；对 bsdtar 与 Linux/macOS CI 无影响。
+// Bugfix: Windows GNU tar（Git Bash）会把 `-f` 参数里的盘符冒号（C:）当成远程主机名，
+// 反斜杠路径也会被 MSYS 参数转换破坏。`-C` 参数不参与主机名解析，因此解包时把 cwd 切到
+// 归档所在目录、`-f` 只传文件名：同盘、跨目录、跨盘符都成立，bsdtar 与 GNU tar 行为一致。
 function toTarPosixPath(pathValue) {
   return pathValue.replaceAll("\\", "/");
-}
-
-function resolveTarArchiveArg(archivePath, cwd) {
-  if (process.platform === "win32") {
-    try {
-      const relativeArchivePath = relative(cwd, archivePath);
-      if (relativeArchivePath && !relativeArchivePath.startsWith("..")) {
-        return toTarPosixPath(relativeArchivePath);
-      }
-    } catch {
-      // 跨盘符时 relative 会抛错，退回正斜杠绝对路径（bsdtar 可用）。
-    }
-  }
-
-  return toTarPosixPath(archivePath);
 }
 
 export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cwd }) {
@@ -54,12 +39,10 @@ export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cw
     return;
   }
 
-  const tarCwd = cwd ?? process.cwd();
-  runCommand(
-    "tar",
-    ["-xzf", resolveTarArchiveArg(archivePath, tarCwd), "-C", toTarPosixPath(extractDir)],
-    { cwd: tarCwd },
-  );
+  const archiveFilePath = resolve(archivePath);
+  runCommand("tar", ["-xzf", basename(archiveFilePath), "-C", toTarPosixPath(extractDir)], {
+    cwd: dirname(archiveFilePath),
+  });
 }
 
 export function findPrebuiltBinary(rootDir, binaryName) {
