@@ -600,6 +600,26 @@ function signWindowsHelper(context, relativeHelperPath) {
   ]);
 }
 
+// dmgbuild 在镜像内生成的 .background.tiff / .VolumeIcon.icns 没有坐标时，Finder 开启
+// 「显示隐藏文件」会把它们按默认网格压到安装背景标题上。dmgbuild 1.6.7 支持
+// type:"position" 只写 .DS_Store 坐标、不复制文件；electron-builder 26.17.0 的配置
+// schema 仍只接受 dir/file/link（上游 PR #10183 尚未发布），因此在 schema 校验之后注入。
+// 坐标放在 540x380 窗口可见区域之外，详见 docs/electron/electron-builder-26.17-upgrade.md。
+const DMG_HIDDEN_FILE_PINNED_POSITIONS = [
+  { path: ".background.tiff", x: 330, y: 1000 },
+  { path: ".VolumeIcon.icns", x: 430, y: 1000 },
+];
+
+function pinDmgHiddenFilePositions(dmgOptions) {
+  if (dmgOptions?.contents == null) return;
+  // beforePack 会按架构重复执行，dmg 配置对象按平台共享，注入必须幂等。
+  if (dmgOptions.contents.some((entry) => entry?.type === "position")) return;
+
+  for (const entry of DMG_HIDDEN_FILE_PINNED_POSITIONS) {
+    dmgOptions.contents.push({ ...entry, name: entry.path, type: "position" });
+  }
+}
+
 /** @type {import("electron-builder").Configuration} */
 export default {
   appId: desktopProductIdentity.appId,
@@ -657,6 +677,9 @@ export default {
     `node_modules/node-pty/prebuilds/${targetPlatform.key}/**`,
   ],
   beforePack: async (context) => {
+    if (context.electronPlatformName === "darwin") {
+      pinDmgHiddenFilePositions(context.packager.config.dmg);
+    }
     runTimedSync("beforePack:restoreTargetNodePtyPrebuild", () =>
       restoreTargetNodePtyPrebuild({ desktopPackageRoot, targetPlatform }),
     );
@@ -1017,6 +1040,8 @@ export default {
       // 在镜像内自行生成的隐藏文件，不是源文件；把它们列进 contents 在旧 dmgbuild
       // 上被容忍，在新 dmgbuild 上直接 ditto 报 "Cannot get the real path"（2026-10-23
       // CI x64 DMG 实况）。隐藏文件坐标交给 dmgbuild 默认摆放，不再显式列举。
+      // 其中 .background.tiff / .VolumeIcon.icns 的摆位由 beforePack 注入的
+      // type:"position" 条目钉到窗口外，原因见 docs/electron/electron-builder-26.17-upgrade.md。
       { x: 130, y: 220 },
       { x: 410, y: 220, type: "link", path: "/Applications" },
     ],

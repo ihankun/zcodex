@@ -48,6 +48,14 @@ Windows 安装器继续使用仓库的 `installer.nsh` 和阶段 patch。26.17.0
 
 dmg-builder@1.2.5 的 dmgbuild 会把 `dmg.contents` 中每个 `type:"file"` 条目当作真实源文件执行 `ditto <path>`，相对路径按 dmgbuild 进程 cwd 解析。`.background.tiff`、`.VolumeIcon.icns` 等隐藏文件由 dmgbuild 在镜像内自行生成，不是源文件；把它们列入 contents 在旧 dmgbuild 上被容忍，在 1.2.5 上会在 DMG 阶段以 `Cannot get the real path` 硬失败。contents 只允许引用真实存在的源文件（通常仅省略 path 的应用条目与 `/Applications` 链接）。
 
+### DMG 隐藏文件坐标
+
+dmgbuild 在镜像内生成的 `.background.tiff` / `.VolumeIcon.icns` 若没有 `.DS_Store` 坐标，Finder 会按默认网格摆放；用户开启「显示隐藏文件」（⇧⌘.，仅当前 Finder 会话生效）后，这两个图标会压住安装背景标题区。
+
+dmgbuild 1.6.7 支持 `contents` 中 `type:"position"` 的条目：只写入 `Iloc` 坐标，不复制文件、不参与 `ditto`。electron-builder 26.17.0 的配置 schema 仍只接受 `dir|file|link`（上游 PR #10183 尚未发布），所以由 `beforePack` 在 schema 校验之后、DMG target 构建之前，向 `packager.config.dmg.contents` 幂等追加两条 position，把两个隐藏文件钉到 540×380 窗口可见区域之外（y=1000）。
+
+验收：DMG 内 `.DS_Store` 同时包含 `.background.tiff` / `.VolumeIcon.icns` 的 `Iloc`；应用条目与 `/Applications` 坐标保持 130/410 @220；dmgbuild 不因 position 条目执行 `ditto`；未显示隐藏文件时安装页与历史版本一致。
+
 ### Windows 签名只接受 PE
 
 26.8.1 旧收集器只打包 desktop 实际链接的 node_modules，Windows 构建只包含 win32 变体；26.17.0 的 pnpm 收集器按 lockfile 全平台图收包，会把 `sharp` 的 optionalDependencies（`@img/sharp-darwin-*`、`@img/sharp-linux*` 等 Mach-O/ELF 变体）一并打进 `app.asar`，smartUnpack 再把它们落到 `app.asar.unpacked`。`WinPackager.signApp` 在 afterPack 之后遍历 unpacked 目录签名（第二簇），非 PE 文件会被送进 vsigntool；DigiCert token 处理非 PE 输入后进入坏状态，同一 job 内后续所有签名（含 bundle.mjs 整命令重试轮里本来健康的 win32 文件）连锁报 `0x8010006a`。2026-10-26 CI 实况：同一轮第一簇（copy 阶段 extraResources，纯 win32 PE）全绿，第二簇起全部拒绝。
