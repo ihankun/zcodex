@@ -165,7 +165,6 @@ export {
   BROWSER_VIEW_RESTORE_BOOTSTRAP_URL,
   LOCAL_MEDIA_PREVIEW_SCHEME,
   BROWSER_VIEW_DRAFT_SESSION_ID,
-
   BROWSER_LOCAL_PREVIEW_SCHEME,
   browserPreviewSourceUrl,
   DesktopCommandIds,
@@ -246,6 +245,7 @@ export type {
   SaveFileRequest,
   SaveFileResult,
   PrintPageToPdfResult,
+  MicrophoneAccessResetResult,
   MicrophoneAccessResult,
   MicrophoneSettingsTarget,
   CaptureBrowserGuestPageClip,

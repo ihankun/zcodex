@@ -1,13 +1,13 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
-> 上游基线：**ZCode v3.18.0 = `b95ebaff`**（`chore: sync ZCode source v3.18.0`；上一基线 v3.17.2 = `a9fe401e`，已并入 dev）。
-> fork 版本号独立演进，当前 `1.5.3`（上游 v3.18.0 合并这一轮未随合并升版本）。
+> 上游基线：**ZCode v3.18.1 = `c5904686`**（`chore: sync ZCode source v3.18.1`；上一基线 v3.18.0 = `b95ebaff`，已并入 dev）。
+> fork 版本号独立演进，当前 `1.6.0`（上游 v3.18.1 合并这一轮未随合并升版本）。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
-> `git diff b95ebaff dev -- .` 即全部本地改动；
+> `git diff c5904686 dev -- .` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-11-11（v3.18.0 合并，见第七节）。
+> 最近复核：2026-11-13（v3.18.1 合并，见第七节）。
 
 ## 一、概览
 
@@ -117,6 +117,11 @@
 - `packages/services/src/extensions/**`、`packages/shared/src/extension-host/grants.ts` — 扩展授权/审计 `~/.zcodex/v2/extensions`
 - `packages/zcode-server-cli/src/cli.ts`、`runtime/releaseManager.ts` — `~/.zcodex/v2/credentials.json`
 - `packages/desktop/scripts/auto-update-ca-constraints-smoke.mjs`、`scripts/mcp-apps-host-fixture/session-ready-main.ts` — 脚本里的临时 home / agent-data 路径
+
+**v3.18.1 新增的上游数据路径（已按本规则改名）**：memory diagnostics 的写入端
+`apps/zcode-cli/packages/adapters/src/memory-diagnostics/index.ts`（`~/.zcodex/cli/memory-diagnostics`）、
+读取端 `packages/services/src/feedback/compactLogArchive.ts` 与 `packages/desktop/src/main/exportLogs.ts`
+（同一目录 + 归档前缀）共 5 处 `.zcode` → `.zcodex`。上游后续再动 memory diagnostics 时同样处理。
 
 **远端部署**：`packages/server/src/remote/deployShared.ts`（`REMOTE_BASE = "~/.zcodex/server"`）、`connect.ts`、`zcodeAgentBundleWrapper.ts`、`packages/zcode-server-cli/src/runtime/paths.ts`
 
@@ -553,6 +558,11 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 注意 locale 的 **key** 里含 `ZCode` / `zcode`（`openInZCode`、`toggleZCodeStdioTap`、
 `settingsSync.agent.zcode`、`settings.zcodeInteractionBehavior` 等），**替换只能动值、不能动 key**
 （2026-11-11 踩坑，见第三节）。
+
+**v3.18.1 新增文案（2026-11-13）**：语音输入麦克风权限引导 `voiceInput.permission.*`（zh/en 各 8 条）
+与安装器「请关闭 ZCodex 后重试」提示已按本节统一为 `ZCodex`；上游删除了
+`voiceInput.error.permissionDenied.mac` / `.windows`（只保留 `.linux`），代码中已无引用，不补回。
+ja-JP / ko-KR / ru-RU 本轮只新增字体平滑文案，无品牌字样。
 
 **刻意不改（要改先想清楚）：**
 
@@ -1386,6 +1396,43 @@ zh-CN / en-US 中上游新增的 15 处 `ZCode` 文案同样已改。
 **基线注意**：v3.18.0 后 `packages/ui/src/i18n/locales` 有 5 个文件，任何「全仓 ZCode 替换」都要
 先排除注释与 key；`packages/desktop/scripts/mcp-apps-host-fixture` 等上游脚本里的路径已随本次改名，
 上游下次更新同文件时优先取上游再重施 `.zcodex`。
+
+### 2026-11-13 上游 v3.18.0 → v3.18.1
+
+上游提交：`c5904686 chore: sync ZCode source v3.18.1`（111 文件，+3906/−528；根 `package.json` 3.18.1）。
+补丁版同步：Windows 安装器旧进程清理、macOS 字体平滑开关、语音输入麦克风权限引导、
+CLI memory diagnostics、更新窗口与安装器若干修复。
+
+**冲突 6 处，处理方式：**
+
+| 类别     | 文件                                                                                                                                    | 处理                                                                                                                                               |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 配置     | `.gitignore`                                                                                                                            | 取并集（fork 的项目级机器产物 + 上游 `packages/desktop/build/generated/`）                                                                         |
+| 版本     | `package.json`                                                                                                                          | 保留 fork `zcodex` / `1.6.0`（本轮未随合并升版本；发版时按 patch 升 1.6.1）                                                                        |
+| 打包     | `packages/desktop/electron-builder.config.js`                                                                                           | 两个函数都保留：fork 的 DMG 隐藏文件钉位（`pinDmgHiddenFilePositions`）与上游的 installer process helper define；各自在 beforePack/afterPack 调用  |
+| 设置页   | `packages/ui/src/settingsCodePreview.tsx`                                                                                               | 两行设置项并列：fork 的 Windows 窗口效果 + 上游 macOS 字体平滑；props 解构取并集                                                                   |
+| i18n     | `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts`                                                                                         | 接受上游删除 `voiceInput.error.permissionDenied.mac/windows`（代码已无引用），新增 `voiceInput.permission.*` 按 2.7 重施 `ZCodex`                  |
+| 自动合并 | 其余 26 个双方都改过的文件（`App.tsx`、`SettingsPage.tsx`、`installer.nsh`、`exportLogs.ts`、`channels.ts`、`platform.ts`、preload 等） | 逐项复核本地定制：`appLogoUrl` 传递链、Windows `h-0`、升级入口移除、手动更新 IPC、`ZCODE_PRODUCT_FLAVOR`、applyAppIcon 条件、force-gate 删除均保持 |
+
+**上游新增数据路径（按 2.2 改名）**：memory diagnostics 的写入端
+`apps/zcode-cli/packages/adapters/src/memory-diagnostics/index.ts`、读取端
+`packages/services/src/feedback/compactLogArchive.ts` 与 `packages/desktop/src/main/exportLogs.ts`
+（同一目录 + 归档前缀）共 5 处 `.zcode` → `.zcodex`；第六节 ① grep 复查 0 行。
+
+**上游新增用户可见文案**：`voiceInput.permission.*`（zh/en 各 8 条）与安装器
+「请关闭 ZCodex 后重试」提示统一为 `ZCodex`；ja/ko/ru 仅新增字体平滑文案，无品牌字样。
+
+**上游带来的新依赖**：无（`pnpm-lock.yaml` 未变，无需 `pnpm install`；上游只动了 npm 的
+`package-lock.json` 与 CLI adapters 的 `./memory-diagnostics` 子路径导出）。
+
+**合并后自查（2026-11-13 实测）**：`pnpm typecheck` exit 0；`pnpm lint` 539 warnings / 0 errors；
+`pnpm db:schema:check` 8 passed；`pnpm test:architecture` 61 passed；`pnpm architecture:check --changed`
+0 违规；`pnpm i18n:check -- --baseline f792f962` ① 3207 个 id 全部可解析、② 仅 2 条上游删除 key、
+②b 无品牌值被覆盖；`tsconfig.main.json` 0 errors；`tsconfig.renderer.json` 169 → 171（新增 2 处均为
+上游 `window.zcode.resetMicrophoneAccess` 调用点，属既有缺口类别）；`apps/zcode-cli/packages/adapters`
+单独 `tsc --noEmit` 通过；工程测试 `nsis-install-section-patch`、`gen-ui-runtime-assets`、
+`windowsInstallerCompile`（1 skipped）与新增 `node --test scripts/test/installer-process-helper.test.mjs`
+（Windows 用例 skip）通过。未执行桌面 E2E（本机无 Chromium，环境受限）。
 
 ## 八、注意事项
 
