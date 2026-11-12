@@ -19,7 +19,6 @@ import {
   type OAuthProviderId,
   type OAuthAccountAvailability,
   isZaiOAuthProvider,
-  resolveModelProviderFamilyIdByProviderId,
   resolveModelProviderFamilySpecByProviderId,
   resolveProviderFamilyDomainFromOAuthProvider,
   toZhOrEnLocale,
@@ -173,17 +172,17 @@ function resolveBuiltinPresetOAuthProvider(
 
 // 智谱品牌入口只在对应族真正可用（已连接账号）时才默认展示；
 // 未连接时不占侧栏，用户可在“添加供应商”里主动展开，连接后常驻。
+// 注意：不能改用上游的 providerFamilyDomain / availableFamilies 判定——前者只表示当前账号区域，
+// 未连接时也会命中，会让 BigModel / Start Plan 重新常驻侧栏（2.3.5）。
 function isPresetProviderConnected(
   presetId: BuiltinModelProviderId,
-  providerFamilyDomain: ProviderFamilyDomain | null | undefined,
-  availableFamilies: readonly ProviderFamilyDomain[] = [],
+  provider: ProviderSettingsFormProvider | null,
 ): boolean {
   const presetOAuthProvider = resolveBuiltinPresetOAuthProvider(presetId);
   if (!presetOAuthProvider) {
     return true;
   }
-  const family = resolveModelProviderFamilyIdByProviderId(presetId);
-  return family === providerFamilyDomain || (family !== null && availableFamilies.includes(family));
+  return provider?.accountState?.availability === "available";
 }
 
 function clearPendingProviderFamilyConnectionSelection(
@@ -603,19 +602,12 @@ export function ModelProviderSection({
       PRESET_PROVIDER_SPECS.flatMap((preset) => {
         const provider =
           modelProviders.find((candidate) => candidate.providerId === preset.id) ?? null;
-        if (
-          !revealedPresetIds.has(preset.id) &&
-          !isPresetProviderConnected(
-            preset.id,
-            effectiveProviderFamilyDomain,
-            accountAvailability?.families,
-          )
-        ) {
+        if (!revealedPresetIds.has(preset.id) && !isPresetProviderConnected(preset.id, provider)) {
           return [];
         }
         return [{ ...preset, provider }];
       }),
-    [modelProviders, revealedPresetIds, effectiveProviderFamilyDomain, accountAvailability],
+    [modelProviders, revealedPresetIds],
   );
 
   const presetPickerEntries = useMemo(
