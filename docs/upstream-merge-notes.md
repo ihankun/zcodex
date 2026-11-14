@@ -123,6 +123,12 @@
 读取端 `packages/services/src/feedback/compactLogArchive.ts` 与 `packages/desktop/src/main/exportLogs.ts`
 （同一目录 + 归档前缀）共 5 处 `.zcode` → `.zcodex`。上游后续再动 memory diagnostics 时同样处理。
 
+**v3.18.2 新增的上游数据路径（已按本规则改名）**：凭据系统密钥登记
+`packages/desktop/src/main/desktopHostProcess.ts`（按 `copyDataDirectory` 的目标布局推导
+`{目标根}/.zcodex/v2/credentials.json`）与 E2E 用例
+`test/e2e/auth-config/credentials/manual-review/pending/system-credential-data-root.test.ts`
+（自定义数据根下的凭据文件断言）各 1 处 `.zcode` → `.zcodex`。上游后续再动这段密钥登记时同样处理。
+
 **远端部署**：`packages/server/src/remote/deployShared.ts`（`REMOTE_BASE = "~/.zcodex/server"`）、`connect.ts`、`zcodeAgentBundleWrapper.ts`、`packages/zcode-server-cli/src/runtime/paths.ts`
 
 **services**：`settingService`、`deviceMid`、`telemetryCore`、`subagentsService`、`subagentStorage`、`pluginSyncService`、`node.ts`、`settingsSyncService`、`skillSyncService`、`skillsService`、`commandsService`、`mcpSyncService`、`providerRuntimeResolver`、`modelTrajectoryFileTail`、`zcodeAgentService`、`zcodeTaskServiceAdapter`、`hooksService`（仅 user 级分支）
@@ -1433,6 +1439,35 @@ CLI memory diagnostics、更新窗口与安装器若干修复。
 单独 `tsc --noEmit` 通过；工程测试 `nsis-install-section-patch`、`gen-ui-runtime-assets`、
 `windowsInstallerCompile`（1 skipped）与新增 `node --test scripts/test/installer-process-helper.test.mjs`
 （Windows 用例 skip）通过。未执行桌面 E2E（本机无 Chromium，环境受限）。
+
+### 2026-11-14 上游 v3.18.1 → v3.18.2
+
+上游提交：`fec97590 chore: sync ZCode source v3.18.2`（46 文件，+1971/−171；根 `package.json` 3.18.2）。
+补丁版同步：国内未关联 BigModel 账号的 Start Plan 登录修复（共享登录渠道→Start 家族映射）、
+切换数据存储路径时由 Main 登记凭据系统密钥（Linux 无 keyring 时启用私有文件密钥回退）、
+PowerShell 命令与 E2E 环境调整。
+
+**冲突 1 处**：`package.json` 版本字段。保留 fork `zcodex` / `1.6.1`（本轮不随合并升版本）。
+其余 45 个双方都动过的文件自动合并；重点复核 `ModelProviderSection.tsx` /
+`useModelProviderNavigation.ts`：上游新增的 `startPlanFamilyDomain` 只影响 coding plan 项判定，
+本地「未连接隐藏智谱品牌入口」（2.3.5，`accountState.availability` 判据）与「Start 跟随品牌入口
+可见性注入」均保持，未被上游语义覆盖。
+
+**本地适配**：`packages/desktop/src/main/desktopHostProcess.ts` 新代码按上游布局推导
+`{目标根}/.zcode/v2/credentials.json`，本 fork 数据根是 `.zcodex`（2.2），已改为 `.zcodex`；
+对应 E2E `system-credential-data-root.test.ts` 的自定义根断言同步改名。若沿用 `.zcode`，
+切换数据根后系统密钥会登记到不存在的目标路径，上游修复在本 fork 失效。
+
+**上游新增数据路径**：见 2.2「v3.18.2 新增的上游数据路径」。
+
+**上游新增用户可见文案**：无（本轮 locale 文件未变、无新增 i18n id）。
+
+**上游带来的新依赖**：无（`pnpm-lock.yaml` 未变，无需 `pnpm install`；上游只动了 npm 的
+`package-lock.json` 版本字段）。
+
+**合并后自查（2026-11-14 实测）**：`pnpm typecheck` exit 0；`pnpm lint` 540 warnings / 0 errors
+（与合并前基线同量级）；本轮未执行桌面 E2E（新增两个用例在 `manual-review/pending`，需要真实
+系统钥匙串，本机无 Chromium 且非 macOS 原生环境）。
 
 ## 八、注意事项
 

@@ -21,6 +21,7 @@ import {
   isZaiOAuthProvider,
   resolveModelProviderFamilySpecByProviderId,
   resolveProviderFamilyDomainFromOAuthProvider,
+  resolveStartPlanFamilyFromOAuthProvider,
   toZhOrEnLocale,
   ZAI_PROVIDER_ID,
 } from "@zcode/shared";
@@ -466,6 +467,10 @@ export function ModelProviderSection({
   const effectiveProviderFamilyDomain =
     sharedSettings?.providerFamilyDomain ??
     resolveProviderFamilyDomainFromOAuthProvider(activeOAuthProvider);
+  // Start 与 Host 共用登录渠道映射：国内登录（zai_cn）未关联时付费家族为空，Start 仍属于 BigModel。
+  const startPlanFamilyDomain =
+    sharedSettings?.providerFamilyDomain ??
+    resolveStartPlanFamilyFromOAuthProvider(activeOAuthProvider);
   const { entitlements: codingPlanEntitlements, refresh: refreshCodingPlanEntitlements } =
     useCodingPlanEntitlements({
       providerSettingsView,
@@ -697,6 +702,7 @@ export function ModelProviderSection({
       codingPlanEntitlements,
       subscribedTeamProducts,
       providerFamilyDomain: effectiveProviderFamilyDomain,
+      startPlanFamilyDomain,
       availableFamilies: accountAvailability?.families,
       connectionSelections: effectiveConnectionSelections,
       pendingConnectionSelections,
