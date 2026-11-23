@@ -19,6 +19,7 @@
 | 启动与桌面行为：force-gate、Dock 图标、DMG 底图             | `packages/desktop/src/main`、`build/`       | 2.4  |
 | 桌面自动更新改走 GitHub Release，未签名构建回退手动安装     | desktop + shared + client + ui + web + 构建 | 2.5  |
 | 内置插件：纯源码 seed（载荷机制已删除）                     | 构建流程与产物                              | 2.6  |
+| 预装文档工具：完全跟随上游，依赖上游 CDN                    | desktop / shared / 资源                     | 2.13 |
 | 用户可见产品名与文案统一为 `ZCodex`                         | ui i18n / web / CLI / 托盘 / 安装器文案     | 2.7  |
 | Finder 右键「在ZCodex中打开」的 Services 注册               | desktop main（上游代码，仅改文案）          | 2.8  |
 | 自有 App 单测随上游退役，pre-push 回归上游完整门禁          | `package.json` / `vitest.config.ts`         | 2.11 |
@@ -830,6 +831,22 @@ Vitest（`scripts/engineering-test-files.json`，入口 `pnpm test:engineering` 
 - `ZCODE_WEB_REMOTE_CONTROL_URL` 只能改 base URL，改不了 `app_version`，不能作为替代方案；
 - fork 的 `1.x` 版本号仍用于桌面更新、遥测等自有链路，不要把它传回远控链路。
 
+### 2.13 预装工具跟随上游、依赖上游 CDN（2026-11-24 决定）
+
+v4.0.0 的预装文档工具（LibreOffice / Python / qpdf / pandoc / poppler）在 fork 中**保持上游原样**，
+不自建资源镜像、不关闭该能力：
+
+- 资源基址仍为 `packages/desktop/src/preinstalled-tools/catalog.ts` 的
+  `https://cdn-zcode.z.ai/zcode/preinstalled-tools`；`ZCODE_PREINSTALLED_TOOLS_CDN_BASE_URL` 只用于
+  开发联调 / E2E 覆盖，**不要**在打包配置或默认 env 里写死自建地址。
+- 打包、catalog 校验、安装/删除/升级流程都随上游；合并上游时不要为了“离线可用”改成本地资源，
+  也不要按 fork 版本号生成独立资源目录。
+- 资源的分发合规（Poppler/Pandoc 的 GPL 义务等）由上游 CDN 侧承担：
+  `docs/issues/preinstalled-tools/01-license-review.md` 是上游票，fork 不复制其 host 义务；
+  `THIRD-PARTY-NOTICES.md` 随上游同步即可。
+- 若上游更换 CDN 基址或资源命名，按上游改动直接采纳；fork 侧只保留 `.zcodex` 数据落点规则
+  （2.2），不改下载源。
+
 ## 三、踩坑记录（不要再重复）
 
 - **`packages/desktop/src/main/index.ts` 的 `@zcode/shared` 导入列表必须保留 `ZCODE_PRODUCT_FLAVOR`。**
@@ -1552,6 +1569,7 @@ CLI adapters 的 zod 3 → zod 4.6.5）。
   根 `@zcode/shared` devDependency、desktop `tar@7.5.13`；`pnpm install` 已执行。
 
 **新增数据路径**见 2.2「v4.0.0 新增的上游数据路径」；**新增用户可见文案**见 2.7「v4.0.0 新增文案」。
+**决策**：预装工具保持上游原样、依赖上游 CDN（见 2.13），本轮未做任何 fork 侧资源镜像或关闭开关。
 
 **合并后自查（2026-11-24 实测）**：`pnpm typecheck` exit 0（`tsc -b` 链、`remote-main`、`zcode-cua`
 三阶段均 0）；`pnpm lint` **539 warnings / 0 errors**；`pnpm db:schema:check` 通过；
