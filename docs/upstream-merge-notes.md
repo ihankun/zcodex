@@ -1,13 +1,13 @@
 # 本地定制变更记录（合并上游参考）
 
 > 本文件记录本 fork（**ZCodex**）相对上游 ZCode 的**全部**本地定制，处理合并冲突时先读它。
-> 上游基线：**ZCode v3.18.1 = `c5904686`**（`chore: sync ZCode source v3.18.1`；上一基线 v3.18.0 = `b95ebaff`，已并入 dev）。
-> fork 版本号独立演进，当前 `1.6.0`（上游 v3.18.1 合并这一轮未随合并升版本）。
+> 上游基线：**ZCode v4.0.0 = `a4b44451`**（`chore: sync ZCode source v4.0.0`；上一基线 v3.18.2 = `fec97590`，已并入 dev）。
+> fork 版本号独立演进，当前 `1.6.2`（上游 v4.0.0 合并这一轮未随合并升版本）。
 > **判定某处是不是本地定制，不要凭记忆**：上游提交就在本地对象库里，直接
 > `git diff c5904686 dev -- .` 即全部本地改动；
 > 只看「是否涉及 `.zcode` 字样」就能把约 2/3 的改动（数据目录改名）与真正的行为改动分开
 > （2026-09-30 实测：144 个修改文件中 99 个只改了字样）。
-> 最近复核：2026-11-13（v3.18.1 合并，见第七节）。
+> 最近复核：2026-11-24（v4.0.0 合并，见第七节）。
 
 ## 一、概览
 
@@ -128,6 +128,24 @@
 `{目标根}/.zcodex/v2/credentials.json`）与 E2E 用例
 `test/e2e/auth-config/credentials/manual-review/pending/system-credential-data-root.test.ts`
 （自定义数据根下的凭据文件断言）各 1 处 `.zcode` → `.zcodex`。上游后续再动这段密钥登记时同样处理。
+
+**v4.0.0 新增的上游数据路径（已按本规则改名）**：
+
+- `apps/zcode-cli/packages/adapters/src/browser/storage-state.ts` — 浏览器登录态默认路径
+  `[".zcodex", "cli", "browser-state.json"]`（上游新增；CLI i18n 的 `--no-browser-state`
+  帮助文案同步改为 `~/.zcodex/cli/browser-state.json`）。
+- `apps/zcode-cli/packages/adapters/src/skills/catalog.ts` — 新增的 `ZCODE_DIR = ".zcodex"`
+  （项目级技能发现根；与 `skills/roots.ts` 同口径）。
+- `apps/zcode-cli/packages/bootstrap/src/app/dynamic-mcp-config.ts` — 项目
+  `.zcodex/config.json` 的 MCP fallback 键。
+- `packages/zcode-server-cli/src/runtime/paths.ts` — 上游新增
+  `sharedCredentialsFile = <dataBaseDir>/.zcodex/v2/credentials.json`（`layout` 字段，
+  Desktop 共享凭据库）；`apps/zcode-cli` 与 `packages/shared/src/credential-security/credentialFile.ts`
+  的注释同步改写。
+- `packages/desktop/scripts/cli-diagnostic-evidence-smoke.mjs` — memory diagnostics 归档前缀
+  `.zcodex/cli/memory-diagnostics`。
+- 仅注释里的路径也同步：`apps/zcode-cli/packages/bootstrap/src/workspace-plugin-trust/index.ts`、
+  `packages/contracts/src/interfaces/file-system.port.ts`、`core/src/tool/handlers/write.ts`。
 
 **远端部署**：`packages/server/src/remote/deployShared.ts`（`REMOTE_BASE = "~/.zcodex/server"`）、`connect.ts`、`zcodeAgentBundleWrapper.ts`、`packages/zcode-server-cli/src/runtime/paths.ts`
 
@@ -282,6 +300,12 @@
 顺带删掉了现在会打头的分隔线，并加了「非桌面端不渲染该按钮」的门（剩下几项全是桌面专属，
 Web 上否则会剩一个点开是空的菜单）。
 
+**v4.0.0 新增「预装工具」入口（已采纳，2026-11-24）**：上游在资源管理器之后加了
+`preinstalledTools.title` 菜单项（testId `workspace-help-menu-preinstalled-tools`），打开
+`PreinstalledToolsDialog`。它展示本机预装文档工具（LibreOffice / Python / qpdf / pandoc / poppler）
+的安装状态与下载入口，属本机能力、不访问上游产品服务，按上述口径保留；其余五项上游产品服务入口
+（含「报告安全问题」）继续不显示。
+
 **② macOS 原生菜单栏的「帮助」菜单**（`packages/desktop/src/main/desktopApplicationMenu.ts`）——
 移除 **更新日志**（`helpWhatsNew` → `OpenChangelog`）与 **问题上报**（`helpFeedback` → `OpenFeedback`）。
 更新日志那项连同它后面的分隔线一起删（在 macOS 上它原本是菜单第一项，留着会让菜单以分隔线开头）；
@@ -400,6 +424,12 @@ REF-02/03/04 仍按 `rewards-menu-item` 断言（且还断言 2.3.8 已删除的
 Windows 包默认不启用签名（`ZCODE_ENABLE_WINDOWS_SIGN` 未设置，见 `electron-builder.config.js`），
 照搬会让未签名安装包无法自动安装。合并时保留本地 `applyGitHubReleaseUpdateFeed` 与 `installCapability`
 分支，不要恢复 `verifyWindowsAuthenticodeSignature` 调用或 `manifestUpdateProvider`。
+
+**v4.0.0 新增的 Linux 包更新授权提示（已采纳，2026-11-24）**：`quitAndInstallUpdate` 新增
+`showLinuxAuthorization` 参数与 `shouldWarnAboutLinuxSudoAuthorization` /
+`confirmLinuxPackageAuthorization`；系统包更新（deb/rpm）前提示可能需要管理员授权，用户选择稍后时
+保留 ready 包。该分支与本地 GitHub Release/手动安装链路不冲突，已整体保留；Windows 签名校验块仍按上一段
+替换为本地说明注释，不引入 `verifyWindowsAuthenticodeSignature`。
 
 #### 改动清单（合并冲突时保护本地版本）
 
@@ -569,6 +599,21 @@ Squirrel 比对的是运行中应用与下载包的**签名标识要求（design
 与安装器「请关闭 ZCodex 后重试」提示已按本节统一为 `ZCodex`；上游删除了
 `voiceInput.error.permissionDenied.mac` / `.windows`（只保留 `.linux`），代码中已无引用，不补回。
 ja-JP / ko-KR / ru-RU 本轮只新增字体平滑文案，无品牌字样。
+
+**v4.0.0 新增文案（2026-11-24）**：以下用户可见串已按本节统一为 `ZCodex`：
+
+- `packages/desktop/src/main/autoUpdater.ts` — Linux 包更新授权弹窗正文（zh/en，各 3 处）。
+- `packages/desktop/src/main/desktopCommandHandlers.ts` — 崩溃恢复对话框 `CRASH_RECOVERY_MESSAGES`
+  的 5 种语言 detail。
+- `packages/ui/src/i18n/locales/{zh-CN,en-US}.ts` — 预装工具（`preinstalledTools.*` 3 条多行值）
+  与分享服务版本提示（`conversationShare.*` 1 条）里的产品名；ja/ko/ru 覆盖层对应值也已替换。
+- `packages/desktop/src/main/file-open-apps/executableOpenGuard.ts` — 可执行文件打开确认的原生
+  对话框标题。
+
+`apps/zcode-cli/packages/bootstrap/src/auth-login.ts` 的
+`"Login succeeded but updating ZCode config failed."` 属带错误码的 CLI 诊断文本，按 2.7「内部诊断文本」
+口径保持上游原样；`official-plugin-definitions.ts` 的插件商店描述与 zcode-guide 的 listing 文案仍按
+2.7.1 末尾的既有决定留待单独处理。
 
 **刻意不改（要改先想清楚）：**
 
@@ -1468,6 +1513,63 @@ PowerShell 命令与 E2E 环境调整。
 **合并后自查（2026-11-14 实测）**：`pnpm typecheck` exit 0；`pnpm lint` 540 warnings / 0 errors
 （与合并前基线同量级）；本轮未执行桌面 E2E（新增两个用例在 `manual-review/pending`，需要真实
 系统钥匙串，本机无 Chromium 且非 macOS 原生环境）。
+
+### 2026-11-24 上游 v3.18.2 → v4.0.0
+
+上游提交：`a4b44451 chore: sync ZCode source v4.0.0`（2209 文件，+149753/−24801；根 `package.json` 4.0.0；
+CLI adapters 的 zod 3 → zod 4.6.5）。
+
+**冲突 12 处（全部 content），处理方式：**
+
+| 类别      | 文件                                                                                                     | 处理                                                                                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本/配置 | `package.json`                                                                                           | 保留 fork `zcodex` / `1.6.2`；采纳上游 `imports` 预装工具子路径、`lint` 文档检查、`test:git-invocation` 与新依赖（`@zcode/shared`、`tar-stream`、`unbzip2-stream`、`yauzl`、`zod@4.6.5`） |
+| 自动更新  | `packages/desktop/src/main/autoUpdater.ts`                                                               | 保留 GitHub Release feed、手动安装与菜单 `installDownloadedUpdate()`；**采纳**上游 Linux 包授权提示；Windows Authenticode 强制校验继续替换为本地说明注释（2.5）                           |
+| 桌面启动  | `packages/desktop/src/main/index.ts`                                                                     | 保留 `if (!app.isPackaged) applyAppIcon(...)`；上游已把语言回退块前移，冲突处只留本地 Dock 图标判断；import 取并集补 `guardWindowNavigation`                                              |
+| 帮助菜单  | `packages/ui/src/WorkspaceHelpMenuButton.tsx`                                                            | 保留本地精简菜单与 Web 不渲染门；采纳上游新增「预装工具」入口与 `PreinstalledToolsDialog`（2.3.7）                                                                                        |
+| Web       | `packages/web/src/main.tsx`                                                                              | 采纳上游 `webAuthService.resolveCallbackReturnTo`，保留 `ZCodex` 页面标题                                                                                                                 |
+| CLI 凭据  | `packages/zcode-server-cli/src/cli.ts`、`runtime/releaseManager.ts`                                      | 采纳上游共享库/自有库拆分（`prepareServerCredentialFile`、`layout.sharedCredentialsFile`）；`runtime/paths.ts` 的共享库路径按 2.2 改 `.zcodex`                                            |
+| 字面量    | `wdio.conf.ts`、`android-emulator/README.md`、`shared/managed-worktree/CONTRACT.md`、`core/.../agent.ts` | 取上游内容后重施 `.zcodex`（E2E HOME 注释、插件缓存版本 0.1.3、受管 worktree 根、子代理定义路径）                                                                                         |
+| 文档      | `docs/composer-model-thinking.md`                                                                        | 采纳上游 Popover 合并面板重写与验收记录，保留「模型名前显示 Provider logo」的本地描述                                                                                                     |
+
+**上游主要内容：**
+
+- **预装文档工具**：新增 `scripts/preinstalled-tools/**`（LibreOffice / Python / qpdf / pandoc / poppler
+  的下载、校验、安装与调用脚本）、`packages/ui/src/preinstalled-tools/**` 与帮助菜单入口、
+  Main 进程的预装工具进程管理（`preinstalledToolsProcess`、Windows entry shim）；文档类插件
+  （documents / pdf / presentations / spreadsheets）改为使用预装工具，`docs/preinstalled-tools/**`
+  与 `docs/issues/document-tool-preinstall/**` 记录完整方案。
+- **CLI 浏览器持久登录态**：`adapters/src/browser/storage-state.ts` 读写
+  `~/.zcodex/cli/browser-state.json`（Cookie/Origin 校验、BOM、权限位），`--no-browser-state` 可跳过。
+- **Agent/CLI**：子代理 `alwaysBackground` 模式（工具描述随开关切换）、turn steering、
+  Bash 工具 AST 权限语义、CUA 独立进程内 broker、MCP node fallback、draft 模型迁移、会话活动关闭确认。
+- **桌面**：崩溃恢复对话框（5 语言）、Linux 包更新 sudo 授权提示、可执行文件打开确认、文件打开方式子菜单修复。
+- **MCP/插件**：设置作用域重置、同名服务器优先级、开关持久化、热重载与 OAuth 隔离修复；
+  workspace plugin dir trust；插件 UI 初始主题。
+- **数据/工程**：config merge legacy 嵌套字段修复；Host 文件监听不再阻塞 RPC；E2E 隔离
+  （仓库内 HOME、URL Source Server）；`pnpm lint` 增加文档工具检查脚本。
+- **依赖**：zod 3 → 4.6.5（CLI adapters）、`tar-stream` / `unbzip2-stream` / `yauzl`（预装工具解包）、
+  根 `@zcode/shared` devDependency、desktop `tar@7.5.13`；`pnpm install` 已执行。
+
+**新增数据路径**见 2.2「v4.0.0 新增的上游数据路径」；**新增用户可见文案**见 2.7「v4.0.0 新增文案」。
+
+**合并后自查（2026-11-24 实测）**：`pnpm typecheck` exit 0（`tsc -b` 链、`remote-main`、`zcode-cua`
+三阶段均 0）；`pnpm lint` **539 warnings / 0 errors**；`pnpm db:schema:check` 通过；
+`pnpm test:architecture` 61 个用例（60 pass / 1 skipped）；`pnpm architecture:check --changed` 0 违规；
+`pnpm i18n:check -- --baseline a446c658` ① 3220 个 id 全部可解析，② zh/en 各 44 条均为上游 v4.0.0
+删除的旧 key（`chat.statusPanel.*`、`chat.summaryPanel.*`、`chat.composer.backgroundWorks.tooltip*`，
+代码中已无引用，不恢复），②b 无品牌值被覆盖；Gen UI 资源哈希用例通过；
+`tsconfig.renderer.json` 171 → 175（新增 4 处均为上游新文件 `desktopBrowserPlatformBridge.ts` 的
+`window.zcode` 调用，属既有缺口类别）；第六节 ①/② grep 干净。
+
+**本轮额外修复**：合并把上游 E2E `settings-ui-polish.test.ts` 的 import 列表整体更新后，本地 UP-03
+用例仍引用 `TID_SETTINGS_SECTION_NAV`，已补回该 import（由 `pnpm typecheck` 抓出）。属
+「上游重写 import、本地新增用例仍在用」的一类冲突，后续合并上游 E2E 文件时注意同类残留。
+
+**未执行**：桌面 E2E（本机无 Chromium，环境受限）；全量工程测试。环境噪音：本机 Node 24.18.0 与
+`mise.toml` 固定的 24.14.0 不一致，pnpm 报 `Unsupported engine` 警告，非代码问题。
+
+**版本**：上游为功能大版本，按第八节第 4 条发版时应升 minor（`1.6.x` → `1.7.0`）；本轮只合并不升版本。
 
 ## 八、注意事项
 
