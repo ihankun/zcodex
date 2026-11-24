@@ -101,15 +101,15 @@ UTF-8 编码的 JSON，由预装进程按安装记录中的入口定义生成：
 
 ## shim 的来源、构建与签名
 
-| 项目     | 规定                                                                                                                                                                                               |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 源码     | `packages/desktop/native/windows-preinstalled-entry-shim/`：一份 C 源文件和 `CMakeLists.txt`。只依赖 Windows API，静态链接 C 运行库                                                                |
-| 构建     | `pnpm --filter @zcode/desktop prepare:preinstalled-entry-shim`。MSVC/CMake（Visual Studio 17 2022 生成器），与 native-search 编译 `ugrep.exe` 的方式相同。按 `ZCODE_TARGET_ARCH` 产出 x64 或 arm64 |
-| 开发产物 | `packages/desktop/bundled-tools/win32-<arch>/preinstalled-entry-shim/zcode-preinstalled-entry-shim.exe`（已被 gitignore）。Windows 本地准备运行资源时自动构建                                      |
-| 打包位置 | `resources/preinstalled-entry-shim/zcode-preinstalled-entry-shim.exe`。每个安装包只带自己架构的 shim                                                                                               |
-| 签名     | 与浏览器导入辅助程序相同：electron-builder 钩子显式签名，并校验签名者与 App 主程序一致                                                                                                             |
-| 传递     | Main 解析 shim 的绝对路径，经预装进程的 `initialize` 消息传入（字段 `windowsEntryShim`，只在 Windows 上有）。预装进程不自己推算路径                                                                |
-| 替换判断 | 以 shim 文件的 SHA-256 判断 bin 中的 `.exe` 是否需要替换，不另设版本号                                                                                                                             |
+| 项目     | 规定                                                                                                                                                                                                                                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 源码     | `packages/desktop/native/windows-preinstalled-entry-shim/`：一份 C 源文件和 `CMakeLists.txt`。只依赖 Windows API，静态链接 C 运行库                                                                                                                                                                     |
+| 构建     | `pnpm --filter @zcode/desktop prepare:preinstalled-entry-shim`。MSVC/CMake（按本机 Visual Studio 自动选择 `Visual Studio 17 2022` / `Visual Studio 18 2026` 生成器，可用 `ZCODE_WINDOWS_CMAKE_GENERATOR` 覆盖），与 native-search 编译 `ugrep.exe` 的方式相同。按 `ZCODE_TARGET_ARCH` 产出 x64 或 arm64 |
+| 开发产物 | `packages/desktop/bundled-tools/win32-<arch>/preinstalled-entry-shim/zcode-preinstalled-entry-shim.exe`（已被 gitignore）。Windows 本地准备运行资源时自动构建                                                                                                                                           |
+| 打包位置 | `resources/preinstalled-entry-shim/zcode-preinstalled-entry-shim.exe`。每个安装包只带自己架构的 shim                                                                                                                                                                                                    |
+| 签名     | 与浏览器导入辅助程序相同：electron-builder 钩子显式签名，并校验签名者与 App 主程序一致                                                                                                                                                                                                                  |
+| 传递     | Main 解析 shim 的绝对路径，经预装进程的 `initialize` 消息传入（字段 `windowsEntryShim`，只在 Windows 上有）。预装进程不自己推算路径                                                                                                                                                                     |
+| 替换判断 | 以 shim 文件的 SHA-256 判断 bin 中的 `.exe` 是否需要替换，不另设版本号                                                                                                                                                                                                                                  |
 
 ## 受影响的其他部分
 

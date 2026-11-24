@@ -10,6 +10,10 @@ import {
 } from "./native-search-tools-config.mjs";
 import { downloadAndExtractSources, run } from "./native-search-tools-process.mjs";
 import { verifyBuiltNativeSearchProducerOutputs } from "./native-search-tools-verify.mjs";
+import {
+  resolveWindowsCmakeExecutable,
+  resolveWindowsCmakeGenerator,
+} from "./windows-cmake-toolchain.mjs";
 
 const windowsCmakeProject = resolve(import.meta.dirname, "native-search-tools-windows");
 
@@ -39,8 +43,8 @@ export function resolveNativeWindowsBuildConfig({
   }
   return {
     arch: normalizedArch,
-    cmake: env.CMAKE?.trim() || "cmake",
-    generator: "Visual Studio 17 2022",
+    cmake: resolveWindowsCmakeExecutable({ env }),
+    generator: resolveWindowsCmakeGenerator({ env }),
     generatorArchitecture: normalizedArch === "arm64" ? "ARM64" : "x64",
     hostArch: normalizedHostArch,
     platform: normalizedPlatform,

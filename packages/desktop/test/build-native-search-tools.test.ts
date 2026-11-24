@@ -56,7 +56,6 @@ const windowsNativeSearchCmake = readFileSync(
   "utf8",
 );
 
-
 // 内网依赖源由环境显式配置；用中性主机，测试不依赖仓库默认的内网地址（开源导出里默认地址为空）。
 const INTRANET_ENV = { INTRANET_MACHINE_HOST: "intranet-deps.example" };
 const INTRANET_DEPS_BASE_URL = "http://intranet-deps.example:12345/zcode/deps";
@@ -195,7 +194,11 @@ describe("native search build", () => {
         `${INTRANET_DEPS_BASE_URL}/native-search-tools/ripgrep-v14.1.1-1/ripgrep-v14.1.1-1-aarch64-apple-darwin.tar.gz`,
       ],
     ]);
-    const linux = resolveNativeSearchPrebuiltPlan({ platform: "linux", arch: "x64", env: INTRANET_ENV });
+    const linux = resolveNativeSearchPrebuiltPlan({
+      platform: "linux",
+      arch: "x64",
+      env: INTRANET_ENV,
+    });
     expect(
       linux.artifacts.map(({ toolId, releaseFileName, source }) => [
         toolId,
@@ -217,10 +220,13 @@ describe("native search build", () => {
     ]);
     expect(linux.artifacts.at(-1)).toMatchObject({
       archiveSha256: NATIVE_SEARCH_OFFICIAL_RIPGREP_ASSETS["linux-x64"].sha256,
-      downloadUrl:
-        `${INTRANET_DEPS_BASE_URL}/native-search-tools/ripgrep-v14.1.1-1/ripgrep-v14.1.1-1-x86_64-unknown-linux-musl.tar.gz`,
+      downloadUrl: `${INTRANET_DEPS_BASE_URL}/native-search-tools/ripgrep-v14.1.1-1/ripgrep-v14.1.1-1-x86_64-unknown-linux-musl.tar.gz`,
     });
-    const windows = resolveNativeSearchPrebuiltPlan({ platform: "win32", arch: "x64", env: INTRANET_ENV });
+    const windows = resolveNativeSearchPrebuiltPlan({
+      platform: "win32",
+      arch: "x64",
+      env: INTRANET_ENV,
+    });
     expect(windows.artifacts).toMatchObject([
       {
         archiveExt: "zip",
@@ -770,7 +776,7 @@ describe("native search build", () => {
       arch: "x64",
       hostPlatform: "win32",
       hostArch: "x64",
-      env: {},
+      env: { CMAKE: "cmake", ZCODE_WINDOWS_CMAKE_GENERATOR: "Visual Studio 17 2022" },
     });
     expect(x64Config).toMatchObject({
       arch: "x64",
@@ -784,13 +790,21 @@ describe("native search build", () => {
       arch: "arm64",
       hostPlatform: "win32",
       hostArch: "x64",
-      env: {},
+      env: { CMAKE: "cmake", ZCODE_WINDOWS_CMAKE_GENERATOR: "Visual Studio 17 2022" },
     });
     expect(arm64Config).toMatchObject({
       arch: "arm64",
       generatorArchitecture: "ARM64",
       platform: "win32",
     });
+    const vs2026Config = resolveNativeWindowsBuildConfig({
+      platform: "win32",
+      arch: "x64",
+      hostPlatform: "win32",
+      hostArch: "x64",
+      env: { ZCODE_WINDOWS_CMAKE_GENERATOR: "Visual Studio 18 2026" },
+    });
+    expect(vs2026Config.generator).toBe("Visual Studio 18 2026");
     expect(x64Config).not.toHaveProperty("cargo");
     expect(arm64Config).not.toHaveProperty("cargo");
     expect(windowsNativeSearchCmake).toMatch(

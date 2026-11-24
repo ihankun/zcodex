@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 // Windows 入口 shim 的构建、校验和隔离副本；规格见 docs/preinstalled-tools/windows-entry-shim.md。
-import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { arch, platform, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { promisify } from "node:util";
 import { withE2EDesktopBuildLock } from "./ensure-e2e-desktop-build.mjs";
 import { spawnCancellableStep } from "./e2e-step-process.mjs";
+import {
+  resolveWindowsCmakeExecutable,
+  resolveWindowsCmakeGenerator,
+} from "../../../scripts/windows-cmake-toolchain.mjs";
 
-const exec = promisify(execFile);
 const desktopRoot = resolve(import.meta.dirname, "..");
 const sourceRoot = join(desktopRoot, "native/windows-preinstalled-entry-shim");
 const outputName = "zcode-preinstalled-entry-shim.exe";
@@ -85,34 +86,6 @@ function remaining(deadline) {
   return duration;
 }
 
-/** 只装 Build Tools 时按 vswhere 查找 CMake；查询也属于同一个准备预算。 */
-async function resolveCmake(deadline) {
-  if (process.env.CMAKE?.trim()) return process.env.CMAKE.trim();
-  const vswhere = join(
-    process.env["ProgramFiles(x86)"] ?? "C:/Program Files (x86)",
-    "Microsoft Visual Studio/Installer/vswhere.exe",
-  );
-  try {
-    const { stdout } = await exec(
-      vswhere,
-      [
-        "-latest",
-        "-products",
-        "*",
-        "-requires",
-        "Microsoft.VisualStudio.Component.VC.CMake.Project",
-        "-find",
-        "Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe",
-      ],
-      { timeout: remaining(deadline), killSignal: "SIGKILL", encoding: "utf8", windowsHide: true },
-    );
-    return stdout.split(/\r?\n/).find(Boolean)?.trim() || "cmake";
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    return "cmake";
-  }
-}
-
 async function runCmake(command, args, deadline) {
   const { result } = spawnCancellableStep({
     command,
@@ -128,7 +101,8 @@ async function runCmake(command, args, deadline) {
 }
 
 async function build(outputDir, targetArch, source, deadline) {
-  const command = await resolveCmake(deadline);
+  const command = resolveWindowsCmakeExecutable();
+  const generator = resolveWindowsCmakeGenerator();
   const work = await mkdtemp(join(tmpdir(), "zcode-preinstalled-entry-shim-"));
   try {
     const buildDir = join(work, "build");
@@ -141,7 +115,7 @@ async function build(outputDir, targetArch, source, deadline) {
         "-B",
         buildDir,
         "-G",
-        "Visual Studio 17 2022",
+        generator,
         "-A",
         targetArch === "arm64" ? "ARM64" : "x64",
         `-DZCODE_SHIM_OUTPUT_DIR=${builtDir.replaceAll("\\", "/")}`,

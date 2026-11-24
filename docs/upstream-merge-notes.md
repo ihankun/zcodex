@@ -20,6 +20,7 @@
 | 桌面自动更新改走 GitHub Release，未签名构建回退手动安装     | desktop + shared + client + ui + web + 构建 | 2.5  |
 | 内置插件：纯源码 seed（载荷机制已删除）                     | 构建流程与产物                              | 2.6  |
 | 预装文档工具：完全跟随上游，依赖上游 CDN                    | desktop / shared / 资源                     | 2.13 |
+| Windows 打包 CMake 生成器兼容 VS 2026（18.x）               | `scripts/`、`packages/desktop/scripts`      | 2.14 |
 | 用户可见产品名与文案统一为 `ZCodex`                         | ui i18n / web / CLI / 托盘 / 安装器文案     | 2.7  |
 | Finder 右键「在ZCodex中打开」的 Services 注册               | desktop main（上游代码，仅改文案）          | 2.8  |
 | 自有 App 单测随上游退役，pre-push 回归上游完整门禁          | `package.json` / `vitest.config.ts`         | 2.11 |
@@ -846,6 +847,34 @@ v4.0.0 的预装文档工具（LibreOffice / Python / qpdf / pandoc / poppler）
   `THIRD-PARTY-NOTICES.md` 随上游同步即可。
 - 若上游更换 CDN 基址或资源命名，按上游改动直接采纳；fork 侧只保留 `.zcodex` 数据落点规则
   （2.2），不改下载源。
+
+### 2.14 Windows 打包 CMake 生成器兼容 VS 2026（2026-11-24）
+
+上游 3 处 Windows 原生构建脚本都硬编码 `-G "Visual Studio 17 2022"`，且 runtime-host 直接
+`spawn(process.env.CMAKE || "cmake")`。本机把 VS 2022 升级为 **VS 2026（18.x）** 后：
+
+- `CMAKE` 仍指向已卸载 VS 2022 的 cmake，spawn 直接 `ENOENT`；
+- 即使路径改对，VS 17 生成器也找不到 VS 2022 实例。
+
+本地修复（新增共享模块，合并上游时保留）：
+
+- `scripts/windows-cmake-toolchain.mjs`
+  - `resolveWindowsCmakeExecutable()`：`CMAKE` 为相对命令名时原样使用；绝对路径失效时回退
+    PATH 的 `cmake`，再回退 vswhere 找到的 VS 自带 cmake。
+  - `resolveWindowsCmakeGenerator()`：优先 `ZCODE_WINDOWS_CMAKE_GENERATOR`，否则按 vswhere
+    报告的 VS 大版本映射 `18 → Visual Studio 18 2026`、`17 → Visual Studio 17 2022`、
+    `16 → Visual Studio 16 2019`，检测不到时回退上游默认的 VS 17 2022。
+- 接入 `scripts/build-windows-runtime-host.mjs`、`scripts/native-search-tools-windows.mjs`、
+  `packages/desktop/scripts/build-windows-preinstalled-entry-shim.mjs`（后者删除了自带的
+  vswhere 解析，避免两套逻辑）。
+- 回归测试：`scripts/test/windows-cmake-toolchain.test.mjs`（生成器映射 / env 覆盖）、
+  `scripts/test/windows-runtime-host-build.test.mjs`（VS 18 覆盖）、
+  `packages/desktop/test/build-native-search-tools.test.ts`（VS 18 override）。
+  运行：`node --test scripts/test/windows-runtime-host-build.test.mjs scripts/test/windows-cmake-toolchain.test.mjs`
+  与 `pnpm test:engineering packages/desktop/test/build-native-search-tools.test.ts`。
+
+上游以后若自己支持 VS 2026，优先采纳上游实现，但要保留 `ZCODE_WINDOWS_CMAKE_GENERATOR` 覆盖；
+不要退回单点硬编码。
 
 ## 三、踩坑记录（不要再重复）
 

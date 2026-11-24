@@ -4,6 +4,10 @@ import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  resolveWindowsCmakeExecutable,
+  resolveWindowsCmakeGenerator,
+} from "./windows-cmake-toolchain.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const source = join(root, "scripts/windows-runtime-host");
@@ -12,13 +16,14 @@ export function resolveRuntimeHostBuild(
   arch,
   hostPlatform = process.platform,
   compiler = process.env.ZCODE_WINDOWS_CXX,
+  env = process.env,
 ) {
   if (arch !== "x64" && arch !== "arm64")
     throw new Error(`Unsupported runtime host architecture: ${arch}`);
   return {
     configureArgs:
       hostPlatform === "win32"
-        ? ["-G", "Visual Studio 17 2022", "-A", arch === "arm64" ? "ARM64" : "x64"]
+        ? ["-G", resolveWindowsCmakeGenerator({ env }), "-A", arch === "arm64" ? "ARM64" : "x64"]
         : [
             "-DCMAKE_SYSTEM_NAME=Windows",
             `-DCMAKE_CXX_COMPILER=${compiler || (arch === "arm64" ? "aarch64-w64-mingw32-clang++" : "x86_64-w64-mingw32-g++")}`,
@@ -49,7 +54,9 @@ async function sourceDigest() {
 
 function run(args) {
   return new Promise((resolveRun, reject) => {
-    const child = spawn(process.env.CMAKE || "cmake", args, { stdio: "inherit" });
+    const cmake =
+      process.platform === "win32" ? resolveWindowsCmakeExecutable() : process.env.CMAKE || "cmake";
+    const child = spawn(cmake, args, { stdio: "inherit" });
     child.once("error", reject);
     child.once("exit", (code) =>
       code === 0 ? resolveRun() : reject(new Error(`Runtime host CMake failed: ${code}`)),

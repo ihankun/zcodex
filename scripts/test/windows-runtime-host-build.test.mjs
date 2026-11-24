@@ -2,19 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveRuntimeHostBuild, verifyRuntimeHostPe } from "../build-windows-runtime-host.mjs";
 
+const VS_2022_ENV = { ZCODE_WINDOWS_CMAKE_GENERATOR: "Visual Studio 17 2022" };
+
 test("Windows builds both supported architectures with the matching MSVC target", () => {
-  assert.deepEqual(resolveRuntimeHostBuild("x64", "win32").configureArgs, [
+  assert.deepEqual(resolveRuntimeHostBuild("x64", "win32", undefined, VS_2022_ENV).configureArgs, [
     "-G",
     "Visual Studio 17 2022",
     "-A",
     "x64",
   ]);
-  assert.deepEqual(resolveRuntimeHostBuild("arm64", "win32").configureArgs, [
-    "-G",
-    "Visual Studio 17 2022",
-    "-A",
-    "ARM64",
-  ]);
+  assert.deepEqual(
+    resolveRuntimeHostBuild("arm64", "win32", undefined, VS_2022_ENV).configureArgs,
+    ["-G", "Visual Studio 17 2022", "-A", "ARM64"],
+  );
   assert.throws(() => resolveRuntimeHostBuild("ia32", "win32"), /architecture/);
 });
 test("cross builds explicitly select a Windows compiler", () => {
@@ -26,6 +26,15 @@ test("cross builds explicitly select a Windows compiler", () => {
       "-DCMAKE_CXX_COMPILER=example-clang++",
     ),
   );
+});
+test("generator override supports Visual Studio 2026 (18.x)", () => {
+  const env = { ZCODE_WINDOWS_CMAKE_GENERATOR: "Visual Studio 18 2026" };
+  assert.deepEqual(resolveRuntimeHostBuild("x64", "win32", undefined, env).configureArgs, [
+    "-G",
+    "Visual Studio 18 2026",
+    "-A",
+    "x64",
+  ]);
 });
 test("packaging rejects wrong-architecture and corrupt PE binaries", () => {
   const bytes = Buffer.alloc(128);

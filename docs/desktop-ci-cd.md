@@ -204,15 +204,17 @@ sockets are minted as random `broker-<hex>.sock` files; do not hard-code
   安装同时覆盖两者（`rpm` + `xz-utils`），镜像建议预装以避免每次打包现场补装。
 - `build:windows:x64` / `build:windows:arm64` 需要带 `windows` tag 的 runner，并预装 Node.js、Python 3.10+、Visual Studio Build Tools 2022（含 `VC.Tools.x86.x64`）；当前由 x64 Windows runner 交叉生成 arm64 Electron/NSIS 安装包。arm64 job 会按目标架构重新编译 CUA 原生 addon，因此**始终**要求 VS 2022 的 `VC.Tools.ARM64` 组件（不再只在 `ugrep` 补产分支下要求）。共享 deps 缺少对应 `ugrep` 归档且允许补产时，runner 还必须提供 CMake、`curl` 和 `tar`；已有归档的普通打包路径不因这条冷启动分支额外要求这些 native-search producer 命令。
 - **Windows 打包必定编译 `zcode-runtime-host.exe`（v3.18.0 起）**：`prepare:runtime-assets` 固定执行
-  `prepare:windows-runtime-host` → `scripts/build-windows-runtime-host.mjs`，CMake 生成器固定为
-  `Visual Studio 17 2022`（arm64 用 `-A ARM64`）。因此 runner 与本地打包机必须预装 **CMake ≥ 3.20**
-  和 **VS 2022 C++ 工具（MSVC + Windows SDK）**，不再只在这台机器需要补产 `ugrep` 时才要求 CMake。
+  `prepare:windows-runtime-host` → `scripts/build-windows-runtime-host.mjs`，CMake 生成器按本机
+  Visual Studio 大版本自动选择（VS 2022 → `Visual Studio 17 2022`，VS 2026/18.x →
+  `Visual Studio 18 2026`；arm64 用 `-A ARM64`），可用 `ZCODE_WINDOWS_CMAKE_GENERATOR` 显式覆盖。
+  因此 runner 与本地打包机必须预装 **CMake ≥ 3.20** 和 **VS 的 C++ 工具（MSVC + Windows SDK）**，
+  不再只在这台机器需要补产 `ugrep` 时才要求 CMake。
   只装 CMake 不够：缺 MSVC 时 configure 阶段会报找不到编译器；只装 VS 但没勾选「使用 C++ 的桌面开发」
   工作负载时，`VC/Tools/MSVC` 与 Windows SDK 都不存在。CMake 不在 PATH 时可用 `CMAKE` 环境变量指向
   VS 自带 cmake（`.../Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe`）；
-  `scripts/build-windows-runtime-host.mjs` 支持该变量。产物落在
-  `packages/desktop/bundled-tools/win32-<arch>/runtime-host/`，`--ensure` 会校验源码摘要与 PE 架构，
-  源码变化后重新打包会自动重编。
+  该变量指向已卸载的旧 VS 时脚本会忽略并自动回退（PATH → 当前 VS 自带 cmake）。
+  产物落在 `packages/desktop/bundled-tools/win32-<arch>/runtime-host/`，`--ensure` 会校验源码摘要与
+  PE 架构，源码变化后重新打包会自动重编。
 - Windows 打包前会执行 `scripts/ci-ensure-node-gyp-python.ps1` 与 `scripts/ci-import-vcvars64.ps1`，确保 `node-gyp` / `electron-rebuild` 的编译环境完整
   三个平台的正式打包 job 都不得调用 runtime 行为 E2E。native-search 的 Bash toolcall E2E 和 SEA 单文件 runtime-tools E2E 继续保留为独立测试命令；其中 SEA 只验证 CLI 单文件交付，不是 desktop Electron 打包的前置条件。
 
